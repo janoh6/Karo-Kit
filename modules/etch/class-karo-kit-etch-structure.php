@@ -78,7 +78,6 @@ final class Karo_Kit_Etch_Structure {
 			return null;
 		}
 
-		$v = '?ver=' . rawurlencode( KARO_KIT_VER );
 
 		return array(
 			'data'    => array(
@@ -91,9 +90,9 @@ final class Karo_Kit_Etch_Structure {
 			),
 			// Dependency order: logic -> render -> boot.
 			'scripts' => array(
-				KARO_KIT_URL . 'assets/etch/structure.js' . $v,
-				KARO_KIT_URL . 'assets/etch/structure-render.js' . $v,
-				KARO_KIT_URL . 'assets/etch/structure-boot.js' . $v,
+				Karo_Kit_Etch::asset_url( 'assets/etch/structure.js' ),
+				Karo_Kit_Etch::asset_url( 'assets/etch/structure-render.js' ),
+				Karo_Kit_Etch::asset_url( 'assets/etch/structure-boot.js' ),
 			),
 		);
 	}

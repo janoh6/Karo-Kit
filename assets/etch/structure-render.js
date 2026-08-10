@@ -96,16 +96,40 @@ function injectStyles(cfg) {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
+  // Every rule is scoped under .esm-arrows (two classes) on purpose.
+  //
+  // The buttons wear Etch's own .etch-builder-button so they inherit its
+  // colour and hover treatment, but that class also carries
+  // `padding-block: 0.5em`. A bare `.esm-arrow { padding: 0 }` only ties with
+  // it on specificity, and Etch injects its CSS at runtime from builder.js, so
+  // which of the two wins is a race. Scoping, and pinning the box to the icon
+  // size, puts our metrics beyond that race.
+  //
+  // This resolved a real symptom: the structure row visibly grew taller when
+  // hovered, because our cluster ended up taller than the row's line box.
+  // Pinning the buttons to the icon size keeps them the same height as Etch's
+  // own action icons, so revealing them no longer changes the row.
+  //
+  // The exact losing rule was never isolated — a stale cached bundle masked
+  // the fix long enough that the diagnosis ran on the wrong code. Scoping and
+  // fixed metrics make the outcome independent of which rule would have won.
   style.textContent = `
-    .esm-arrows { display:inline-flex; align-items:center; gap:${cfg.gap}; }
-    .esm-arrow {
+    .esm-arrows {
+      display:inline-flex; align-items:center; flex:0 0 auto;
+      gap:${cfg.gap}; line-height:0;
+    }
+    .esm-arrows .esm-arrow {
       display:inline-flex; align-items:center; justify-content:center;
-      background:none; border:0; padding:0; margin:0; line-height:0;
-      cursor:pointer; opacity:1;
+      box-sizing:border-box; flex:0 0 auto;
+      width:${cfg.iconSizePx}px; height:${cfg.iconSizePx}px;
+      min-width:0; min-height:0;
+      padding:0; margin:0; border:0; background:none;
+      line-height:0; cursor:pointer; opacity:1;
       color: var(--e-structure-item-header-foreground-color, currentColor);
     }
-    .esm-arrow:hover { opacity:1; }
-    .esm-arrow.esm-arrow--disabled {
+    .esm-arrows .esm-arrow svg { display:block; }
+    .esm-arrows .esm-arrow:hover { opacity:1; }
+    .esm-arrows .esm-arrow.esm-arrow--disabled {
       opacity: var(--e-inactive-opacity, .4);
       cursor:default; pointer-events:none;
     }

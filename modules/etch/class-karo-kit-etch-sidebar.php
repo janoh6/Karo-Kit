@@ -50,15 +50,14 @@ final class Karo_Kit_Etch_Sidebar {
 			return null;
 		}
 
-		$v = '?ver=' . rawurlencode( KARO_KIT_VER );
 
 		return array(
-			'styles'  => array( KARO_KIT_URL . 'assets/etch/sidebar.css' . $v ),
+			'styles'  => array( Karo_Kit_Etch::asset_url( 'assets/etch/sidebar.css' ) ),
 			'data'    => array(
 				'name'  => 'KaroKitEtchSidebarData',
 				'value' => array( 'remember' => self::remember() ),
 			),
-			'scripts' => array( KARO_KIT_URL . 'assets/etch/sidebar.js' . $v ),
+			'scripts' => array( Karo_Kit_Etch::asset_url( 'assets/etch/sidebar.js' ) ),
 		);
 	}
 }

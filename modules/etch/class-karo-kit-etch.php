@@ -56,6 +56,19 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 	}
 
 	/**
+	 * URL for a bundled asset, cache-busted by its own modification time.
+	 *
+	 * Not the plugin version: these files are edited far more often than the
+	 * version is bumped, and a stale bundle behind an unchanged ?ver= is
+	 * indistinguishable from a fix that didn't work.
+	 */
+	public static function asset_url( string $relative ): string {
+		$path = KARO_KIT_DIR . $relative;
+		$ver  = file_exists( $path ) ? (string) filemtime( $path ) : KARO_KIT_VER;
+		return KARO_KIT_URL . $relative . '?ver=' . rawurlencode( $ver );
+	}
+
+	/**
 	 * Is this request the Etch builder?
 	 *
 	 * Etch opens the builder at home_url('/') with ?etch=magic, and gates its

@@ -127,10 +127,9 @@ final class Karo_Kit_Etch_Board {
 			return null;
 		}
 
-		$v = '?ver=' . rawurlencode( KARO_KIT_VER );
 
 		return array(
-			'styles'  => array( KARO_KIT_URL . 'assets/etch/board.css' . $v ),
+			'styles'  => array( Karo_Kit_Etch::asset_url( 'assets/etch/board.css' ) ),
 			'data'    => array(
 				'name'  => 'KaroKitEtchData',
 				'value' => array(
@@ -140,8 +139,8 @@ final class Karo_Kit_Etch_Board {
 			),
 			// Bridge first (exposes the bridge global), then the board that consumes it.
 			'scripts' => array(
-				KARO_KIT_URL . 'assets/etch/bridge.js' . $v,
-				KARO_KIT_URL . 'assets/etch/board.js' . $v,
+				Karo_Kit_Etch::asset_url( 'assets/etch/bridge.js' ),
+				Karo_Kit_Etch::asset_url( 'assets/etch/board.js' ),
 			),
 		);
 	}
