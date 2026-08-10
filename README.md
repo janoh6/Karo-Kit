@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.8.0
+Stable tag: 0.9.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -49,6 +49,13 @@ Each feature has its own on/off switch. Inert without Etch: the scripts
 self-gate on the Etch API, so nothing renders and nothing breaks on a site
 that doesn't run it.
 
+= Settings transfer =
+
+Export the whole configuration to JSON and import it on another site. Page
+selections travel by slug and are re-matched on the target, so they survive
+differing post IDs; the import shows exactly what it will change, and what it
+couldn't match, before anything is written.
+
 == Installation ==
 
 1. Upload the `karo-kit` folder to `/wp-content/plugins/`.
@@ -56,6 +63,35 @@ that doesn't run it.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.9.0 =
+* Add: settings export / import, from a card on the Dashboard. Export writes a
+  JSON file; import is two-step — upload, review exactly what would change,
+  then apply — because a settings restore is hard to undo.
+* Page settings (login, register, account, lost-password, maintenance, blocked)
+  travel as slug + post type rather than post ID, and are re-matched on the
+  target site. Post IDs mean nothing on another install; copying them verbatim
+  would silently point your login page at an unrelated post. Anything that
+  can't be matched is listed as "No match" and left untouched.
+* Never included: the hidden-login secret word (an export file gets emailed
+  around), the activity log, and generated thumbnails.
+* Import only writes options a module still declares, so a hand-edited file
+  can't be used to set arbitrary WordPress options.
+
+= 0.8.2 =
+* Fix: toggling a setting for the first time was never recorded in the
+  activity log. WordPress routes update_option() through add_option() while a
+  setting still holds its registered default, and only add_option_* fires in
+  that path — so on a fresh site, where every setting is at its default, no
+  toggle was logged at all. Both hooks are now handled.
+
+= 0.8.1 =
+* Add: dark mode for the Karo Kit dashboard. Follows your system setting by
+  default, with an auto / light / dark switcher in the top bar. The choice is
+  saved per user (it's a personal display preference, not a site setting) and
+  applied server-side, so the page never flashes the wrong theme on load.
+* Note: this themes Karo Kit's own screens only. WordPress's admin menu and
+  toolbar keep whatever admin colour scheme is set in your profile.
 
 = 0.8.0 =
 * Add: Structure Arrows in the Etch module — hover-reveal up / down / outdent /

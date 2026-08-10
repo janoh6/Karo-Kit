@@ -20,14 +20,14 @@ final class Karo_Kit_Gate_Settings {
 	public static function init(): void {
 		add_action( 'admin_init', array( __CLASS__, 'register' ) );
 
-		// Config changes worth an audit trail. update_option_* only fires when
-		// the value actually changed, so saving an unchanged form logs nothing.
-		add_action( 'update_option_karo_kit_gate_maintenance_on', array( __CLASS__, 'log_maintenance_toggle' ), 10, 2 );
-		add_action( 'update_option_karo_kit_gate_registration_on', array( __CLASS__, 'log_registration_toggle' ), 10, 2 );
-		add_action( 'update_option_karo_kit_gate_hide_login', array( __CLASS__, 'log_hide_login_toggle' ), 10, 2 );
+		// Config changes worth an audit trail. Nothing is logged when a value
+		// doesn't actually change — WordPress skips the hooks entirely then.
+		Karo_Kit::on_option_change( 'karo_kit_gate_maintenance_on', array( __CLASS__, 'log_maintenance_toggle' ) );
+		Karo_Kit::on_option_change( 'karo_kit_gate_registration_on', array( __CLASS__, 'log_registration_toggle' ) );
+		Karo_Kit::on_option_change( 'karo_kit_gate_hide_login', array( __CLASS__, 'log_hide_login_toggle' ) );
 	}
 
-	public static function log_maintenance_toggle( $old, $new ): void {
+	public static function log_maintenance_toggle( $new ): void {
 		$mode = Karo_Kit_Gate_Mode::from_option( get_option( 'karo_kit_gate_maintenance_mode', 'maintenance' ) );
 		Karo_Kit_Log::add(
 			'maintenance',
@@ -38,14 +38,14 @@ final class Karo_Kit_Gate_Settings {
 		);
 	}
 
-	public static function log_registration_toggle( $old, $new ): void {
+	public static function log_registration_toggle( $new ): void {
 		Karo_Kit_Log::add(
 			'registration',
 			$new ? __( 'Registration opened', 'karo-kit' ) : __( 'Registration closed', 'karo-kit' )
 		);
 	}
 
-	public static function log_hide_login_toggle( $old, $new ): void {
+	public static function log_hide_login_toggle( $new ): void {
 		Karo_Kit_Log::add(
 			'hide_login',
 			$new ? __( 'Hidden login on', 'karo-kit' ) : __( 'Hidden login off', 'karo-kit' )

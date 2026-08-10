@@ -33,9 +33,11 @@ final class Karo_Kit {
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_filter( 'admin_body_class', array( __CLASS__, 'body_class' ) );
 		add_action( 'wp_ajax_karo_kit_save_setting', array( __CLASS__, 'ajax_save_setting' ) );
+		add_action( 'wp_ajax_karo_kit_save_theme', array( __CLASS__, 'ajax_save_theme' ) );
 		// Must run before any output: this handler redirects, and the page
 		// callback fires far too late to send headers.
 		add_action( 'admin_init', array( __CLASS__, 'handle_log_actions' ) );
+		Karo_Kit_Transfer::init();
 	}
 
 	/**
@@ -90,6 +92,31 @@ final class Karo_Kit {
 	/** @return array<string,class-string<Karo_Kit_Module>> */
 	public static function modules(): array {
 		return self::$modules;
+	}
+
+	/**
+	 * Run a callback whenever an option's value changes.
+	 *
+	 * Both hooks are needed, not just update_option_*: when an option is still
+	 * at its registered default it has no DB row yet, so update_option()
+	 * delegates to add_option() and fires only add_option_* (see
+	 * wp-includes/option.php). Hooking update alone silently misses the first
+	 * change of every setting — which, on a fresh site, is all of them.
+	 *
+	 * The two hooks pass their arguments in different orders; this normalises
+	 * them so the callback just receives the new value.
+	 *
+	 * @param string   $option   Option name.
+	 * @param callable $callback Receives the new value.
+	 */
+	public static function on_option_change( string $option, callable $callback ): void {
+		add_action( "add_option_{$option}", static function ( $name, $value ) use ( $callback ) {
+			$callback( $value );
+		}, 10, 2 );
+
+		add_action( "update_option_{$option}", static function ( $old, $new ) use ( $callback ) {
+			$callback( $new );
+		}, 10, 2 );
 	}
 
 	/**
@@ -160,9 +187,44 @@ final class Karo_Kit {
 			$screen = get_current_screen();
 			if ( $screen && self::$hook === $screen->id ) {
 				$classes .= ' karo-kit-app';
+				// Emitted server-side so the page paints in the right theme
+				// straight away — applying it from JS would flash the wrong one.
+				$theme = self::theme();
+				if ( 'auto' !== $theme ) {
+					$classes .= ' kk-theme-' . $theme;
+				}
 			}
 		}
 		return $classes;
+	}
+
+	const THEMES    = array( 'auto', 'light', 'dark' );
+	const THEME_KEY = 'karo_kit_theme';
+
+	/**
+	 * The current user's theme choice: 'auto' (follow the OS), 'light' or
+	 * 'dark'. Per-user rather than a site option — it's a personal display
+	 * preference, not site configuration.
+	 */
+	public static function theme(): string {
+		$theme = (string) get_user_meta( get_current_user_id(), self::THEME_KEY, true );
+		return in_array( $theme, self::THEMES, true ) ? $theme : 'auto';
+	}
+
+	public static function ajax_save_theme(): void {
+		check_ajax_referer( 'karo_kit_autosave', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Not allowed.', 'karo-kit' ) ), 403 );
+		}
+
+		$theme = isset( $_POST['theme'] ) ? sanitize_key( wp_unslash( $_POST['theme'] ) ) : '';
+		if ( ! in_array( $theme, self::THEMES, true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Unknown theme.', 'karo-kit' ) ), 400 );
+		}
+
+		update_user_meta( get_current_user_id(), self::THEME_KEY, $theme );
+		wp_send_json_success( array( 'theme' => $theme ) );
 	}
 
 	public static function render_page(): void {
@@ -171,8 +233,10 @@ final class Karo_Kit {
 		}
 
 		$active = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'dashboard';
-		// 'log' is reachable by link only — deliberately absent from the top nav.
-		if ( 'dashboard' !== $active && 'log' !== $active && ! isset( self::$modules[ $active ] ) ) {
+		// 'log' and 'transfer' are reachable by link only — deliberately absent
+		// from the top nav.
+		$extra = array( 'dashboard', 'log', 'transfer' );
+		if ( ! in_array( $active, $extra, true ) && ! isset( self::$modules[ $active ] ) ) {
 			$active = 'dashboard';
 		}
 		$active_section = isset( $_GET['section'] ) ? sanitize_key( wp_unslash( $_GET['section'] ) ) : '';
@@ -185,6 +249,8 @@ final class Karo_Kit {
 			self::render_dashboard();
 		} elseif ( 'log' === $active ) {
 			self::render_log();
+		} elseif ( 'transfer' === $active ) {
+			Karo_Kit_Transfer::render_preview();
 		} else {
 			self::$modules[ $active ]::render_page();
 		}
@@ -251,8 +317,41 @@ final class Karo_Kit {
 		echo '</nav>';
 
 		echo '<div class="kk-topbar__spacer"></div>';
-		echo '<div class="kk-utility"><span class="kk-utility__version">v' . esc_html( KARO_KIT_VER ) . '</span></div>';
+		echo '<div class="kk-utility">';
+		self::render_theme_switcher();
+		echo '<span class="kk-utility__version">v' . esc_html( KARO_KIT_VER ) . '</span>';
+		echo '</div>';
 		echo '</div></header>';
+	}
+
+	/** Auto / light / dark, as three pressed-state buttons. */
+	private static function render_theme_switcher(): void {
+		$current = self::theme();
+
+		// Lucide-style glyphs, stroked with currentColor so they follow the theme.
+		$icons = array(
+			'auto'  => '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 8a4 4 0 0 1 0 8"/>',
+			'light' => '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>',
+			'dark'  => '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+		);
+		$labels = array(
+			'auto'  => __( 'Match system theme', 'karo-kit' ),
+			'light' => __( 'Light theme', 'karo-kit' ),
+			'dark'  => __( 'Dark theme', 'karo-kit' ),
+		);
+
+		printf( '<div class="kk-theme" role="group" aria-label="%s">', esc_attr__( 'Theme', 'karo-kit' ) );
+		foreach ( $icons as $key => $path ) {
+			printf(
+				'<button type="button" class="kk-theme__btn" data-kk-theme="%s" aria-pressed="%s" title="%s" aria-label="%s"><svg viewBox="0 0 24 24" aria-hidden="true">%s</svg></button>',
+				esc_attr( $key ),
+				( $current === $key ) ? 'true' : 'false',
+				esc_attr( $labels[ $key ] ),
+				esc_attr( $labels[ $key ] ),
+				$path // phpcs:ignore WordPress.Security.EscapeOutput — static inline SVG paths.
+			);
+		}
+		echo '</div>';
 	}
 
 	/**
@@ -261,7 +360,7 @@ final class Karo_Kit {
 	 * serves it?") is answered without crossing the page.
 	 */
 	private static function render_dashboard(): void {
-		self::render_pagehead(
+		self::pagehead(
 			(string) wp_parse_url( home_url(), PHP_URL_HOST ),
 			__( 'Status across every installed module.', 'karo-kit' )
 		);
@@ -324,6 +423,7 @@ final class Karo_Kit {
 		echo '</div>';
 
 		self::render_activity_card();
+		Karo_Kit_Transfer::render_card();
 	}
 
 	/** Last few log entries, with a way through to the full log. */
@@ -374,7 +474,7 @@ final class Karo_Kit {
 
 	/** Full log — reachable from the dashboard card, not from the top nav. */
 	private static function render_log(): void {
-		self::render_pagehead(
+		self::pagehead(
 			__( 'Activity log', 'karo-kit' ),
 			sprintf(
 				/* translators: %d: maximum retained log entries */
@@ -429,7 +529,8 @@ final class Karo_Kit {
 		};
 	}
 
-	private static function render_pagehead( string $title, string $subtitle = '' ): void {
+	/** Shared page header. Public so module/feature classes can use it. */
+	public static function pagehead( string $title, string $subtitle = '' ): void {
 		echo '<div class="kk-pagehead">';
 		echo '<h1 class="kk-pagehead__title">' . esc_html( $title ) . '</h1>';
 		if ( '' !== $subtitle ) {

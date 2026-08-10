@@ -61,6 +61,28 @@ abstract class Karo_Kit_Module {
 	}
 
 	/**
+	 * Settings this module contributes to export / import, as
+	 * option name => kind:
+	 *
+	 *   'value' — copied verbatim.
+	 *   'page'  — a post ID. Post IDs mean nothing on another site, so these
+	 *             travel as slug + post type and are re-resolved on import.
+	 *
+	 * Anything omitted simply doesn't travel. Leave out secrets (they would
+	 * end up in a file people email around), per-site state, and caches.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function export_map(): array {
+		return array();
+	}
+
+	/** Human labels for the options in export_map(), for the import preview. */
+	public static function export_labels(): array {
+		return array();
+	}
+
+	/**
 	 * Optional: id => label pairs for sections that should appear as their own
 	 * top-level tabs (e.g. Site Access / Maintenance / Etch) instead of
 	 * being grouped behind one tab bearing this module's label(). Leave empty

@@ -41,6 +41,40 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 		Karo_Kit_Etch_Settings::render_page();
 	}
 
+	/**
+	 * @inheritDoc
+	 *
+	 * Board column order and per-template statuses are keyed by template slug,
+	 * so they port cleanly. Thumbnails don't travel — they're generated files
+	 * that regenerate on the target site.
+	 */
+	public static function export_map(): array {
+		return array(
+			Karo_Kit_Etch_Board::ENABLED_OPT       => 'value',
+			Karo_Kit_Etch_Board::THRESHOLD_OPT     => 'value',
+			Karo_Kit_Etch_Board::ORDER_OPT         => 'value',
+			Karo_Kit_Etch_Board::STATUS_OPT        => 'value',
+			Karo_Kit_Etch_Structure::ENABLED_OPT   => 'value',
+			Karo_Kit_Etch_Structure::DWELL_OPT     => 'value',
+			Karo_Kit_Etch_Structure::PLACEMENT_OPT => 'value',
+			Karo_Kit_Etch_Structure::DISABLED_OPT  => 'value',
+		);
+	}
+
+	/** @inheritDoc */
+	public static function export_labels(): array {
+		return array(
+			Karo_Kit_Etch_Board::ENABLED_OPT       => __( 'Template Board', 'karo-kit' ),
+			Karo_Kit_Etch_Board::THRESHOLD_OPT     => __( 'Thumbnail refresh threshold', 'karo-kit' ),
+			Karo_Kit_Etch_Board::ORDER_OPT         => __( 'Board column order', 'karo-kit' ),
+			Karo_Kit_Etch_Board::STATUS_OPT        => __( 'Template statuses', 'karo-kit' ),
+			Karo_Kit_Etch_Structure::ENABLED_OPT   => __( 'Structure arrows', 'karo-kit' ),
+			Karo_Kit_Etch_Structure::DWELL_OPT     => __( 'Dwell delay', 'karo-kit' ),
+			Karo_Kit_Etch_Structure::PLACEMENT_OPT => __( 'Arrow position', 'karo-kit' ),
+			Karo_Kit_Etch_Structure::DISABLED_OPT  => __( 'Show unavailable moves', 'karo-kit' ),
+		);
+	}
+
 	/** @inheritDoc */
 	public static function dashboard_groups(): array {
 		$on        = Karo_Kit_Etch_Board::enabled();

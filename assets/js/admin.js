@@ -13,6 +13,44 @@
 		return;
 	}
 
+	/* ---- Theme switcher ---------------------------------------------------
+	 * Applies the choice to the body immediately, then persists it. The
+	 * server already emitted the right class on load, so this only handles
+	 * changes — a failed save leaves the page looking correct for this visit
+	 * and simply reverts on the next one.
+	 */
+	var themeGroup = document.querySelector( '.kk-theme' );
+	if ( themeGroup ) {
+		themeGroup.addEventListener( 'click', function ( e ) {
+			var btn = e.target.closest( '[data-kk-theme]' );
+			if ( ! btn ) {
+				return;
+			}
+			var theme = btn.dataset.kkTheme;
+
+			document.body.classList.remove( 'kk-theme-light', 'kk-theme-dark' );
+			if ( 'auto' !== theme ) {
+				document.body.classList.add( 'kk-theme-' + theme );
+			}
+			themeGroup.querySelectorAll( '[data-kk-theme]' ).forEach( function ( b ) {
+				b.setAttribute( 'aria-pressed', b === btn ? 'true' : 'false' );
+			} );
+
+			var body = new URLSearchParams();
+			body.append( 'action', 'karo_kit_save_theme' );
+			body.append( 'nonce', cfg.nonce );
+			body.append( 'theme', theme );
+			fetch( cfg.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: body.toString()
+			} ).catch( function () {} );
+		} );
+	}
+
+	/* ---- Settings autosave ------------------------------------------------ */
+
 	var form = document.querySelector( '.kk-app form[action$="options.php"]' );
 	if ( ! form ) {
 		return;

@@ -13,18 +13,18 @@ final class Karo_Kit_Etch_Settings {
 
 	public static function init(): void {
 		add_action( 'admin_init', array( __CLASS__, 'register' ) );
-		add_action( 'update_option_' . Karo_Kit_Etch_Board::ENABLED_OPT, array( __CLASS__, 'log_board_toggle' ), 10, 2 );
-		add_action( 'update_option_' . Karo_Kit_Etch_Structure::ENABLED_OPT, array( __CLASS__, 'log_structure_toggle' ), 10, 2 );
+		Karo_Kit::on_option_change( Karo_Kit_Etch_Board::ENABLED_OPT, array( __CLASS__, 'log_board_toggle' ) );
+		Karo_Kit::on_option_change( Karo_Kit_Etch_Structure::ENABLED_OPT, array( __CLASS__, 'log_structure_toggle' ) );
 	}
 
-	public static function log_board_toggle( $old, $new ): void {
+	public static function log_board_toggle( $new ): void {
 		Karo_Kit_Log::add(
 			'etch_board',
 			$new ? __( 'Template Board enabled', 'karo-kit' ) : __( 'Template Board disabled', 'karo-kit' )
 		);
 	}
 
-	public static function log_structure_toggle( $old, $new ): void {
+	public static function log_structure_toggle( $new ): void {
 		Karo_Kit_Log::add(
 			'etch_structure',
 			$new ? __( 'Structure arrows enabled', 'karo-kit' ) : __( 'Structure arrows disabled', 'karo-kit' )

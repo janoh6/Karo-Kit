@@ -5,16 +5,10 @@
    ========================================================================== */
 
 body.karo-kit-app {
-	--kk-ink: #1a1a1d;
-	--kk-muted: #83828c;
-	--kk-nav-bg: #17171b;
-	--kk-nav-text: #a9a8b3;
-	--kk-canvas: #f4f3ef;
-	--kk-surface: #ffffff;
-	--kk-border: #e4e2db;
+	/* ---- Theme-independent ---- */
 	--kk-accent: #ffb020;
+	--kk-accent-hover: #f0a416;
 	--kk-accent-ink: #1a1a1d;
-	--kk-icon-well: #eceae2;
 
 	--kk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
@@ -30,7 +24,96 @@ body.karo-kit-app {
 
 	--kk-gutter: 32px;
 
+	/* ---- Light (default) ---- */
+	--kk-ink: #1a1a1d;
+	--kk-muted: #83828c;
+	--kk-nav-bg: #17171b;
+	--kk-nav-text: #a9a8b3;
+	--kk-nav-meta: #57565f;
+	--kk-nav-strong: #ffffff;
+	--kk-switch-thumb: #ffffff;
+	--kk-canvas: #f4f3ef;
+	--kk-surface: #ffffff;
+	--kk-input-bg: #ffffff;
+	--kk-border: #e4e2db;
+	--kk-icon-well: #eceae2;
+	--kk-tab-active-bg: #ffffff;
+	--kk-tab-active-ink: #1a1a1d;
+	--kk-switch-off: #d8d6cd;
+	--kk-dot-idle: #c9c7bf;
+	--kk-unset: #b6b4ac;
+	--kk-ok: #2f9e44;
+	--kk-danger: #e5484d;
+	--kk-notice-bg: #fff8e6;
+	--kk-notice-ink: #7a5200;
+	--kk-shadow: 0 1px 2px rgba( 0, 0, 0, 0.2 );
+
 	background: var( --kk-canvas );
+	color-scheme: light;
+}
+
+/*
+ * Dark palette.
+ *
+ * Declared twice on purpose: once for "follow the OS" (the default, which a
+ * forced-light choice must be able to opt out of) and once for an explicit
+ * dark choice. A single rule can't serve both, since one lives inside the
+ * media query. Keep the two blocks in sync.
+ */
+@media ( prefers-color-scheme: dark ) {
+	body.karo-kit-app:not( .kk-theme-light ) {
+		--kk-ink: #e9e8ee;
+		--kk-muted: #9b9aa6;
+		--kk-nav-bg: #0e0e12;
+		--kk-nav-text: #9b9aa6;
+		--kk-nav-meta: #6a6975;
+		--kk-nav-strong: #f5f4f8;
+		--kk-switch-thumb: #e4e3ea;
+		--kk-canvas: #131318;
+		--kk-surface: #1c1c23;
+		--kk-input-bg: #16161c;
+		--kk-border: #2c2c36;
+		--kk-icon-well: #262630;
+		--kk-tab-active-bg: #2a2a34;
+		--kk-tab-active-ink: #f5f4f8;
+		--kk-switch-off: #3a3a46;
+		--kk-dot-idle: #4a4a58;
+		--kk-unset: #6a6975;
+		--kk-ok: #6fd48a;
+		--kk-danger: #ff6b6f;
+		--kk-notice-bg: #2e2513;
+		--kk-notice-ink: #f0c76a;
+		--kk-shadow: 0 1px 2px rgba( 0, 0, 0, 0.5 );
+
+		color-scheme: dark;
+	}
+}
+
+body.karo-kit-app.kk-theme-dark {
+	--kk-ink: #e9e8ee;
+	--kk-muted: #9b9aa6;
+	--kk-nav-bg: #0e0e12;
+	--kk-nav-text: #9b9aa6;
+	--kk-nav-meta: #6a6975;
+	--kk-nav-strong: #f5f4f8;
+	--kk-switch-thumb: #e4e3ea;
+	--kk-canvas: #131318;
+	--kk-surface: #1c1c23;
+	--kk-input-bg: #16161c;
+	--kk-border: #2c2c36;
+	--kk-icon-well: #262630;
+	--kk-tab-active-bg: #2a2a34;
+	--kk-tab-active-ink: #f5f4f8;
+	--kk-switch-off: #3a3a46;
+	--kk-dot-idle: #4a4a58;
+	--kk-unset: #6a6975;
+	--kk-ok: #6fd48a;
+	--kk-danger: #ff6b6f;
+	--kk-notice-bg: #2e2513;
+	--kk-notice-ink: #f0c76a;
+	--kk-shadow: 0 1px 2px rgba( 0, 0, 0, 0.5 );
+
+	color-scheme: dark;
 }
 
 /* WP core's "Thank you for creating with WordPress" credit bar — its top
@@ -113,10 +196,11 @@ body.karo-kit-app .kk-app *::after {
 	font-size: var( --kk-text-base );
 }
 
+/* The nav bar is dark in both themes, so this never follows the surface. */
 .kk-brand__name {
 	font-size: 16px;
 	font-weight: 700;
-	color: var( --kk-surface );
+	color: var( --kk-nav-strong );
 }
 
 .kk-tabs {
@@ -137,21 +221,79 @@ body.karo-kit-app .kk-app *::after {
 	white-space: nowrap;
 }
 
+/* Own tokens rather than surface/ink: in dark mode the surface is nearly as
+   dark as the bar, so the active tab would stop reading as raised. */
 .kk-tab--active {
-	background: var( --kk-surface );
-	color: var( --kk-ink );
+	background: var( --kk-tab-active-bg );
+	color: var( --kk-tab-active-ink );
 	font-weight: 600;
+}
+
+.kk-tab:hover,
+.kk-tab:focus-visible {
+	color: var( --kk-tab-active-ink );
 }
 
 .kk-topbar__spacer {
 	flex: 1 1 auto;
 }
 
+.kk-utility {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+
 .kk-utility__version {
 	font-size: var( --kk-text-xs );
 	font-weight: 500;
-	color: #57565f;
+	color: var( --kk-nav-meta );
 	white-space: nowrap;
+}
+
+/* ---- Theme switcher -------------------------------------------------------- */
+
+.kk-theme {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 3px;
+	border-radius: var( --kk-radius-pill );
+	background: rgba( 255, 255, 255, 0.07 );
+}
+
+.kk-theme__btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: var( --kk-radius-pill );
+	background: none;
+	color: var( --kk-nav-text );
+	cursor: pointer;
+	line-height: 0;
+}
+
+.kk-theme__btn:hover {
+	color: var( --kk-nav-strong );
+}
+
+.kk-theme__btn[aria-pressed="true"] {
+	background: var( --kk-tab-active-bg );
+	color: var( --kk-tab-active-ink );
+}
+
+.kk-theme__btn svg {
+	width: 14px;
+	height: 14px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
 /* ---- Page head ------------------------------------------------------------ */
@@ -210,7 +352,7 @@ body.karo-kit-app .kk-app *::after {
 	height: 7px;
 	flex-shrink: 0;
 	border-radius: 50%;
-	background: #c9c7bf;
+	background: var( --kk-dot-idle );
 }
 
 .kk-status--on .kk-status__dot {
@@ -338,11 +480,11 @@ body.karo-kit-app .kk-app *::after {
 	height: 7px;
 	margin-right: 9px;
 	border-radius: 50%;
-	background: #c9c7bf;
+	background: var( --kk-dot-idle );
 }
 
 .kk-log__dot--alert {
-	background: #e5484d;
+	background: var( --kk-danger );
 }
 
 .kk-log__dot--warn {
@@ -378,7 +520,7 @@ body.karo-kit-app .kk-app *::after {
 	width: 38px;
 	height: 22px;
 	border-radius: var( --kk-radius-pill );
-	background: #d8d6cd;
+	background: var( --kk-switch-off );
 	transition: background 0.15s ease;
 }
 
@@ -390,8 +532,8 @@ body.karo-kit-app .kk-app *::after {
 	width: 16px;
 	height: 16px;
 	border-radius: 50%;
-	background: var( --kk-surface );
-	box-shadow: 0 1px 2px rgba( 0, 0, 0, 0.2 );
+	background: var( --kk-switch-thumb );
+	box-shadow: var( --kk-shadow );
 	transition: transform 0.15s ease;
 }
 
@@ -410,6 +552,50 @@ body.karo-kit-app .kk-app *::after {
 .kk-switch__label {
 	font-size: var( --kk-text-sm );
 	line-height: 1.4;
+}
+
+/* ---- Settings transfer ------------------------------------------------------ */
+
+.kk-transfer {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.kk-transfer__sep {
+	width: 1px;
+	align-self: stretch;
+	margin: 0 6px;
+	background: var( --kk-border );
+}
+
+.kk-transfer input[type="file"] {
+	max-width: 100%;
+	font-family: inherit;
+	font-size: var( --kk-text-xs );
+	color: var( --kk-muted );
+}
+
+.kk-transfer input[type="file"]::file-selector-button {
+	margin-right: 10px;
+	padding: 7px 14px;
+	border: 1px solid var( --kk-border );
+	border-radius: var( --kk-radius-pill );
+	background: transparent;
+	color: var( --kk-muted );
+	font-family: inherit;
+	font-size: var( --kk-text-xs );
+	font-weight: 600;
+	cursor: pointer;
+}
+
+/* The module a setting belongs to, under its label in the review table. */
+.kk-transfer__module {
+	display: block;
+	margin-top: 2px;
+	font-size: 11px;
+	color: var( --kk-muted );
 }
 
 /* ---- Form actions bar ------------------------------------------------------ */
@@ -442,11 +628,11 @@ body.karo-kit-app .kk-app *::after {
 }
 
 .kk-savestate--saved {
-	color: #2f9e44;
+	color: var( --kk-ok );
 }
 
 .kk-savestate--error {
-	color: #e5484d;
+	color: var( --kk-danger );
 }
 
 .kk-btn--quiet {
@@ -515,12 +701,12 @@ body.karo-kit-app .kk-app *::after {
 }
 
 .kk-notice--warn {
-	background: #fff8e6;
-	color: #7a5200;
+	background: var( --kk-notice-bg );
+	color: var( --kk-notice-ink );
 }
 
 .kk-table__unset {
-	color: #b6b4ac;
+	color: var( --kk-unset );
 	font-weight: 500 !important;
 }
 
@@ -589,7 +775,8 @@ body.karo-kit-app .kk-app *::after {
 	line-height: 1.6;
 	border: 1px solid var( --kk-border );
 	border-radius: var( --kk-radius-sm );
-	background: var( --kk-surface );
+	background: var( --kk-input-bg );
+	color: var( --kk-ink );
 	box-shadow: none;
 }
 
@@ -655,8 +842,8 @@ body.karo-kit-app .kk-app *::after {
 .kk-app .button-primary:hover,
 .kk-app input.button:focus,
 .kk-app .button-primary:focus {
-	background: #f0a416;
-	border-color: #f0a416;
+	background: var( --kk-accent-hover );
+	border-color: var( --kk-accent-hover );
 	color: var( --kk-accent-ink );
 	box-shadow: none;
 }

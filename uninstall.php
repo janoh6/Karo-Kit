@@ -41,10 +41,17 @@ $karo_kit_options = array(
 	'karo_kit_etch_structure_placement',
 	'karo_kit_etch_structure_show_disabled',
 	'karo_kit_etch_migrated',
+	// Import review stash is a transient, cleaned up separately below.
 );
 
 foreach ( $karo_kit_options as $karo_kit_option ) {
 	delete_option( $karo_kit_option );
+}
+
+// Per-user leftovers: the import review stash and the dashboard theme choice.
+foreach ( get_users( array( 'fields' => 'ID' ) ) as $karo_kit_user ) {
+	delete_transient( 'karo_kit_import_' . $karo_kit_user );
+	delete_user_meta( $karo_kit_user, 'karo_kit_theme' );
 }
 
 /*
