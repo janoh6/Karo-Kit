@@ -1,0 +1,635 @@
+/* ==========================================================================
+   Karo Kit — custom admin shell
+   Scoped entirely under body.karo-kit-app so it never leaks into other
+   wp-admin screens.
+   ========================================================================== */
+
+body.karo-kit-app {
+	--kk-ink: #1a1a1d;
+	--kk-muted: #83828c;
+	--kk-nav-bg: #17171b;
+	--kk-nav-text: #a9a8b3;
+	--kk-canvas: #f4f3ef;
+	--kk-surface: #ffffff;
+	--kk-border: #e4e2db;
+	--kk-accent: #ffb020;
+	--kk-accent-ink: #1a1a1d;
+	--kk-icon-well: #eceae2;
+
+	--kk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+	--kk-text-xs: 12px;
+	--kk-text-sm: 13px;
+	--kk-text-base: 15px;
+	--kk-text-md: 17px;
+
+	--kk-radius-sm: 8px;
+	--kk-radius-md: 14px;
+	--kk-radius-lg: 22px;
+	--kk-radius-pill: 999px;
+
+	--kk-gutter: 32px;
+
+	background: var( --kk-canvas );
+}
+
+/* WP core's "Thank you for creating with WordPress" credit bar — its top
+   border reads as a stray rule floating below our card content. */
+body.karo-kit-app #wpfooter {
+	display: none !important;
+}
+
+body.karo-kit-app .kk-app,
+body.karo-kit-app .kk-app *,
+body.karo-kit-app .kk-app *::before,
+body.karo-kit-app .kk-app *::after {
+	box-sizing: border-box;
+}
+
+.kk-app {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 100%;
+	font-family: var( --kk-font );
+	color: var( --kk-ink );
+	-webkit-font-smoothing: antialiased;
+}
+
+/* No blanket `color: inherit` here — it outranks the single-class component
+   rules below (.kk-tab et al) and would repaint them with the canvas ink. */
+.kk-app a {
+	text-decoration: none;
+}
+
+.kk-table a,
+.kk-card__title a {
+	color: inherit;
+}
+
+.kk-label {
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var( --kk-muted );
+}
+
+/* ---- Top bar ------------------------------------------------------------ */
+
+.kk-topbar {
+	width: 100%;
+	flex-shrink: 0;
+	background: var( --kk-nav-bg );
+}
+
+.kk-topbar__inner {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	width: 100%;
+	padding: 16px var( --kk-gutter );
+	gap: 16px 32px;
+}
+
+.kk-brand {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	gap: 10px;
+}
+
+.kk-brand__mark {
+	width: 30px;
+	height: 30px;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9px;
+	background: var( --kk-accent );
+	color: var( --kk-accent-ink );
+	font-weight: 700;
+	font-size: var( --kk-text-base );
+}
+
+.kk-brand__name {
+	font-size: 16px;
+	font-weight: 700;
+	color: var( --kk-surface );
+}
+
+.kk-tabs {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.kk-tab {
+	display: flex;
+	align-items: center;
+	padding: 10px 18px;
+	border-radius: var( --kk-radius-pill );
+	font-size: var( --kk-text-sm );
+	font-weight: 500;
+	color: var( --kk-nav-text );
+	white-space: nowrap;
+}
+
+.kk-tab--active {
+	background: var( --kk-surface );
+	color: var( --kk-ink );
+	font-weight: 600;
+}
+
+.kk-topbar__spacer {
+	flex: 1 1 auto;
+}
+
+.kk-utility__version {
+	font-size: var( --kk-text-xs );
+	font-weight: 500;
+	color: #57565f;
+	white-space: nowrap;
+}
+
+/* ---- Page head ------------------------------------------------------------ */
+
+.kk-pagehead {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: 100%;
+	padding: 28px var( --kk-gutter ) 0;
+}
+
+.kk-pagehead__title {
+	margin: 0;
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 1.25;
+	letter-spacing: -0.02em;
+	color: var( --kk-ink );
+}
+
+.kk-pagehead__sub {
+	margin: 0;
+	font-size: var( --kk-text-sm );
+	color: var( --kk-muted );
+}
+
+/* ---- Status badges -------------------------------------------------------- */
+
+.kk-statuses {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.kk-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 14px;
+	border-radius: var( --kk-radius-pill );
+	background: var( --kk-canvas );
+	font-size: var( --kk-text-xs );
+	font-weight: 500;
+	color: var( --kk-muted );
+	white-space: nowrap;
+}
+
+.kk-status strong {
+	font-weight: 700;
+	color: var( --kk-ink );
+}
+
+.kk-status__dot {
+	width: 7px;
+	height: 7px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: #c9c7bf;
+}
+
+.kk-status--on .kk-status__dot {
+	background: var( --kk-accent );
+}
+
+/* ---- Content / cards -------------------------------------------------------- */
+
+.kk-content {
+	display: flex;
+	align-items: flex-start;
+	flex-wrap: wrap;
+	width: 100%;
+	flex: 1 1 auto;
+	padding: 20px var( --kk-gutter ) 32px;
+	gap: 20px;
+}
+
+/* Settings tabs: one full-width card per section. */
+.kk-content--grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	align-items: start;
+}
+
+/* Dashboard: read-only status cards flow into as many columns as fit. */
+.kk-content--cols {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 340px, 1fr ) );
+	align-items: start;
+	padding-bottom: 0;
+}
+
+.kk-card {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 0;
+	min-width: 0;
+	gap: 16px;
+	padding: 22px 26px;
+	border-radius: var( --kk-radius-lg );
+	background: var( --kk-surface );
+}
+
+.kk-card__header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.kk-card__title {
+	font-size: var( --kk-text-md );
+	font-weight: 700;
+}
+
+.kk-card__link {
+	flex-shrink: 0;
+	font-size: var( --kk-text-xs );
+	font-weight: 600;
+	color: var( --kk-muted );
+}
+
+.kk-card__link:hover,
+.kk-card__link:focus {
+	color: var( --kk-ink );
+}
+
+.kk-card__foot {
+	margin-top: auto;
+	padding-top: 4px;
+}
+
+.kk-empty {
+	margin: 0;
+	font-size: var( --kk-text-sm );
+	color: var( --kk-muted );
+	line-height: 1.5;
+}
+
+/* ---- Activity log table ---------------------------------------------------- */
+
+.kk-log {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.kk-log th {
+	padding: 0 16px 10px 0;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var( --kk-muted );
+	text-align: left;
+}
+
+.kk-log td {
+	padding: 8px 16px 8px 0;
+	font-size: var( --kk-text-sm );
+	color: var( --kk-ink );
+	vertical-align: baseline;
+}
+
+.kk-log tr td:last-child,
+.kk-log tr th:last-child {
+	padding-right: 0;
+}
+
+.kk-log__time {
+	width: 160px;
+	color: var( --kk-muted );
+	white-space: nowrap;
+}
+
+.kk-log__ip {
+	width: 200px;
+	color: var( --kk-muted );
+	font-variant-numeric: tabular-nums;
+}
+
+.kk-log__dot {
+	display: inline-block;
+	width: 7px;
+	height: 7px;
+	margin-right: 9px;
+	border-radius: 50%;
+	background: #c9c7bf;
+}
+
+.kk-log__dot--alert {
+	background: #e5484d;
+}
+
+.kk-log__dot--warn {
+	background: var( --kk-accent );
+}
+
+/* ---- Toggle switch --------------------------------------------------------- */
+
+.kk-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	cursor: pointer;
+}
+
+/* The real checkbox stays in the DOM (posts, tabs, announces) but out of sight;
+   the track beside it is what's painted. */
+.kk-switch input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect( 0 0 0 0 );
+	white-space: nowrap;
+	border: 0;
+}
+
+.kk-switch__track {
+	position: relative;
+	flex-shrink: 0;
+	width: 38px;
+	height: 22px;
+	border-radius: var( --kk-radius-pill );
+	background: #d8d6cd;
+	transition: background 0.15s ease;
+}
+
+.kk-switch__track::after {
+	content: "";
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: var( --kk-surface );
+	box-shadow: 0 1px 2px rgba( 0, 0, 0, 0.2 );
+	transition: transform 0.15s ease;
+}
+
+.kk-switch input:checked + .kk-switch__track {
+	background: var( --kk-accent );
+}
+
+.kk-switch input:checked + .kk-switch__track::after {
+	transform: translateX( 16px );
+}
+
+.kk-switch input:focus-visible + .kk-switch__track {
+	box-shadow: 0 0 0 2px rgba( 255, 176, 32, 0.45 );
+}
+
+.kk-switch__label {
+	font-size: var( --kk-text-sm );
+	line-height: 1.4;
+}
+
+/* ---- Form actions bar ------------------------------------------------------ */
+
+.kk-actions {
+	display: flex;
+	align-items: center;
+	min-height: 40px;
+	padding: 0 var( --kk-gutter ) 40px;
+}
+
+/* Autosave status. Replaces the submit button once JS takes over; without JS
+   the button stays and the form posts to options.php as normal. */
+.kk-savestate {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: var( --kk-text-xs );
+	font-weight: 600;
+	color: var( --kk-muted );
+	transition: opacity 0.15s ease;
+}
+
+.kk-savestate::before {
+	content: "";
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.kk-savestate--saved {
+	color: #2f9e44;
+}
+
+.kk-savestate--error {
+	color: #e5484d;
+}
+
+.kk-btn--quiet {
+	border: 1px solid var( --kk-border );
+	background: transparent;
+	color: var( --kk-muted );
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.kk-btn--quiet:hover,
+.kk-btn--quiet:focus {
+	color: var( --kk-ink );
+	border-color: var( --kk-muted );
+}
+
+/* The card spans the full width; these label/value pairs don't need to — past
+   ~640px the eye loses the association between the two columns. */
+.kk-table {
+	width: 100%;
+	max-width: 640px;
+	border-collapse: collapse;
+}
+
+.kk-table td {
+	padding: 7px 0;
+	font-size: var( --kk-text-sm );
+}
+
+.kk-table td:first-child {
+	color: var( --kk-muted );
+	padding-right: 16px;
+}
+
+.kk-table td:last-child {
+	text-align: right;
+	font-weight: 600;
+}
+
+.kk-table__unset {
+	color: #b6b4ac;
+	font-weight: 500 !important;
+}
+
+.kk-table a:hover,
+.kk-table a:focus {
+	text-decoration: underline;
+}
+
+/* ---- Skin native Settings API output rendered inside .kk-card ------------- */
+
+.kk-card h2 {
+	font-size: var( --kk-text-base );
+	font-weight: 700;
+	margin: 8px 0 4px;
+}
+
+.kk-card h2:first-child {
+	margin-top: 0;
+}
+
+.kk-card p {
+	font-size: var( --kk-text-sm );
+	color: var( --kk-muted );
+	line-height: 1.5;
+}
+
+.kk-card table.form-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 0;
+}
+
+.kk-card table.form-table th {
+	width: 260px;
+	padding: 7px 24px 7px 0;
+	vertical-align: top;
+	font-size: var( --kk-text-sm );
+	font-weight: 500;
+	line-height: 1.9;
+	color: var( --kk-muted );
+	text-align: left;
+}
+
+.kk-card table.form-table td {
+	padding: 7px 0;
+	vertical-align: top;
+	font-size: var( --kk-text-sm );
+}
+
+.kk-card table.form-table label {
+	display: inline-flex;
+	align-items: flex-start;
+	gap: 8px;
+	font-size: var( --kk-text-sm );
+	line-height: 1.5;
+}
+
+.kk-card input[type="text"],
+.kk-card input[type="number"],
+.kk-card select {
+	font-family: inherit;
+	font-size: var( --kk-text-sm );
+	max-width: 100%;
+	min-height: 0;
+	padding: 3px 8px;
+	line-height: 1.6;
+	border: 1px solid var( --kk-border );
+	border-radius: var( --kk-radius-sm );
+	background: var( --kk-surface );
+	box-shadow: none;
+}
+
+.kk-card select {
+	/* WP core sets a 30px min-height on admin selects; override it. */
+	height: auto;
+	padding-right: 24px;
+}
+
+.kk-card input[type="text"].regular-text {
+	width: 320px;
+}
+
+.kk-card input:focus,
+.kk-card select:focus {
+	border-color: var( --kk-accent );
+	outline: none;
+	box-shadow: 0 0 0 2px rgba( 255, 176, 32, 0.28 );
+}
+
+.kk-card .description {
+	color: var( --kk-muted );
+	font-size: var( --kk-text-xs );
+	margin: 6px 0 0;
+}
+
+.kk-card .kk-table + p.description {
+	margin-top: 12px;
+}
+
+.kk-app p.submit {
+	margin: 0;
+	padding: 0;
+}
+
+/* WP core ships buttons with a fixed height + line-height and near-zero block
+   padding, so the padding set here only reads correctly once those are undone:
+   height/min-height auto, line-height normalised, then block:inline roughly
+   1:2.5. */
+.kk-app input.button,
+.kk-app .button-primary,
+.kk-app .kk-btn--quiet {
+	height: auto;
+	min-height: 0;
+	padding-block: 10px;
+	padding-inline: 26px;
+	line-height: 1.2;
+	border-radius: var( --kk-radius-pill );
+	font-size: var( --kk-text-sm );
+	font-weight: 600;
+	box-shadow: none;
+	text-shadow: none;
+}
+
+.kk-app input.button,
+.kk-app .button-primary {
+	background: var( --kk-accent );
+	border: 1px solid var( --kk-accent );
+	color: var( --kk-accent-ink );
+}
+
+.kk-app input.button:hover,
+.kk-app .button-primary:hover,
+.kk-app input.button:focus,
+.kk-app .button-primary:focus {
+	background: #f0a416;
+	border-color: #f0a416;
+	color: var( --kk-accent-ink );
+	box-shadow: none;
+}
+
+.kk-card table.widefat {
+	border: 1px solid var( --kk-border );
+	border-radius: var( --kk-radius-sm );
+	overflow: hidden;
+}

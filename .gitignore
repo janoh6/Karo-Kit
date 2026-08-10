@@ -1,0 +1,44 @@
+# WordPress
+wp-config.php
+wp-content/uploads/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+vendor/
+node_modules/
+
+# Build/cache
+*.log
+*.cache
+.cache/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editors
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# PHPUnit / coverage
+.phpunit.result.cache
+coverage/
+
+# Composer
+composer.lock
+
+# npm
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
