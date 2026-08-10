@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.11.1
+Stable tag: 0.11.2
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,12 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.11.2 =
+* Fix: the dashboard header left a pale gutter down its left side and hung
+  short of the admin menu, because WordPress pads its content wrapper 20px
+  while our shell draws a full-bleed bar. That padding is now zeroed on our
+  screen only, along with the 65px reserved for the footer we hide.
 
 = 0.11.1 =
 * Fix: dropdown options were unreadable in dark mode. Only the closed select

@@ -122,6 +122,24 @@ body.karo-kit-app #wpfooter {
 	display: none !important;
 }
 
+/*
+ * Core pads its content wrapper (20px left, 65px bottom for the footer). Our
+ * shell draws its own full-bleed bar, so that left padding shows as a pale
+ * gutter beside it and the header reads as hanging rather than attached; the
+ * bottom padding is dead space now the footer is hidden.
+ *
+ * Removed by zeroing core's padding rather than pulling the shell out with a
+ * negative margin — a negative margin plus width:100% is 40px wider than the
+ * container, which is what caused the horizontal scrollbar before.
+ */
+body.karo-kit-app #wpcontent {
+	padding-left: 0;
+}
+
+body.karo-kit-app #wpbody-content {
+	padding-bottom: 0;
+}
+
 body.karo-kit-app .kk-app,
 body.karo-kit-app .kk-app *,
 body.karo-kit-app .kk-app *::before,
