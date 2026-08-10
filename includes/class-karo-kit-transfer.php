@@ -41,11 +41,21 @@ final class Karo_Kit_Transfer {
 
 	/* ---- Export ---------------------------------------------------------- */
 
+	/**
+	 * Everything that contributes settings: the kit itself, then each module.
+	 * Keyed the way they appear in the payload.
+	 *
+	 * @return array<string,class-string>
+	 */
+	private static function sources(): array {
+		return array( '_kit' => Karo_Kit::class ) + Karo_Kit::modules();
+	}
+
 	/** @return array The full payload, ready to encode. */
 	public static function payload(): array {
 		$modules = array();
 
-		foreach ( Karo_Kit::modules() as $id => $class ) {
+		foreach ( self::sources() as $id => $class ) {
 			$options = array();
 
 			foreach ( $class::export_map() as $option => $kind ) {
@@ -170,7 +180,7 @@ final class Karo_Kit_Transfer {
 	 */
 	public static function plan( array $data ): array {
 		$rows    = array();
-		$modules = Karo_Kit::modules();
+		$modules = self::sources();
 
 		foreach ( (array) $data['modules'] as $module_id => $options ) {
 			if ( ! isset( $modules[ $module_id ] ) || ! is_array( $options ) ) {
@@ -188,7 +198,7 @@ final class Karo_Kit_Transfer {
 				}
 
 				$row = array(
-					'module' => $class::label(),
+					'module' => Karo_Kit::class === $class ? __( 'Karo Kit', 'karo-kit' ) : $class::label(),
 					'option' => $option,
 					'label'  => $labels[ $option ] ?? $option,
 					'status' => 'ok',

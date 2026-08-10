@@ -47,6 +47,7 @@ body.karo-kit-app {
 	--kk-notice-bg: #fff8e6;
 	--kk-notice-ink: #7a5200;
 	--kk-shadow: 0 1px 2px rgba( 0, 0, 0, 0.2 );
+	--kk-focus-ring: rgba( 255, 176, 32, 0.35 );
 
 	background: var( --kk-canvas );
 	color-scheme: light;
@@ -84,6 +85,7 @@ body.karo-kit-app {
 		--kk-notice-bg: #2e2513;
 		--kk-notice-ink: #f0c76a;
 		--kk-shadow: 0 1px 2px rgba( 0, 0, 0, 0.5 );
+		--kk-focus-ring: rgba( 255, 176, 32, 0.35 );
 
 		color-scheme: dark;
 	}
@@ -112,6 +114,7 @@ body.karo-kit-app.kk-theme-dark {
 	--kk-notice-bg: #2e2513;
 	--kk-notice-ink: #f0c76a;
 	--kk-shadow: 0 1px 2px rgba( 0, 0, 0, 0.5 );
+	--kk-focus-ring: rgba( 255, 176, 32, 0.35 );
 
 	color-scheme: dark;
 }
@@ -564,7 +567,7 @@ body.karo-kit-app .kk-app *::after {
 }
 
 .kk-switch input:focus-visible + .kk-switch__track {
-	box-shadow: 0 0 0 2px rgba( 255, 176, 32, 0.45 );
+	box-shadow: 0 0 0 2px var( --kk-focus-ring );
 }
 
 .kk-switch__label {
@@ -836,7 +839,7 @@ body.karo-kit-app .kk-app *::after {
 .kk-app select:focus {
 	border-color: var( --kk-accent );
 	outline: none;
-	box-shadow: 0 0 0 2px rgba( 255, 176, 32, 0.28 );
+	box-shadow: 0 0 0 2px var( --kk-focus-ring );
 }
 
 .kk-card .description {
@@ -894,4 +897,19 @@ body.karo-kit-app .kk-app *::after {
 	border: 1px solid var( --kk-border );
 	border-radius: var( --kk-radius-sm );
 	overflow: hidden;
+}
+
+/* Live preview of the accent, showing text on it rather than the colour alone —
+   the accent is a background for text, so that is the part worth seeing. */
+.kk-swatch {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 26px;
+	margin-left: 10px;
+	vertical-align: middle;
+	border-radius: var( --kk-radius-sm );
+	font-size: var( --kk-text-xs );
+	font-weight: 700;
 }

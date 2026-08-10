@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.11.2
+Stable tag: 0.12.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,25 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.12.0 =
+* Add: the dashboard can borrow its accent colour from this site's
+  Automatic.css palette, so the kit matches the build it belongs to instead of
+  asking you to pick a brand colour twice. Choose Primary, Secondary,
+  Tertiary, Accent or Base on the Dashboard tab.
+* Only the accent is borrowed. Surfaces stay neutral, since they carry the
+  light and dark themes and a brand palette driving them is how an admin
+  screen becomes unreadable.
+* Text colour on the accent is computed, not fixed — a dark brand colour gets
+  light text automatically — along with the hover shade and focus ring. If a
+  colour still falls below 4.5:1 the settings card says so rather than
+  silently shipping poor contrast.
+* The choice travels with settings export as a family name rather than a hex,
+  so "use this site's primary" stays meaningful on a target site with its own
+  palette.
+* Falls back to the kit's own colour whenever ACSS is absent, the family is
+  unset, or the stored value isn't a hex (ACSS also stores hsl() and var()
+  references).
 
 = 0.11.2 =
 * Fix: the dashboard header left a pale gutter down its left side and hung

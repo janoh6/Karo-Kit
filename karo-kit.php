@@ -3,7 +3,7 @@
  * Plugin Name:       Karo Kit
  * Plugin URI:        https://karo.ioannesa.com/
  * Description:       Modular site-utility kit for Etch / ACSS WordPress builds. Gate: front-end login & registration plus a maintenance / coming-soon gate, wired to pages you pick from dropdowns. Etch: a Template Board replacing the native Templates screen, plus the dynamic-data and shortcode reference.
- * Version:           0.11.2
+ * Version:           0.12.0
  * Author:            Karo
  * License:           GPL-2.0-or-later
  * Text Domain:       karo-kit
@@ -41,7 +41,7 @@ if ( version_compare( PHP_VERSION, $karo_kit_php_min, '<' )
 	return;
 }
 
-define( 'KARO_KIT_VER', '0.11.2' );
+define( 'KARO_KIT_VER', '0.12.0' );
 define( 'KARO_KIT_FILE', __FILE__ );
 define( 'KARO_KIT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'KARO_KIT_URL', plugin_dir_url( __FILE__ ) );
@@ -49,6 +49,7 @@ define( 'KARO_KIT_URL', plugin_dir_url( __FILE__ ) );
 /* ---- Core ---------------------------------------------------------------- */
 require_once KARO_KIT_DIR . 'includes/class-karo-kit-module.php';
 require_once KARO_KIT_DIR . 'includes/class-karo-kit-log.php';
+require_once KARO_KIT_DIR . 'includes/class-karo-kit-accent.php';
 require_once KARO_KIT_DIR . 'includes/class-karo-kit-transfer.php';
 require_once KARO_KIT_DIR . 'includes/class-karo-kit.php';
 

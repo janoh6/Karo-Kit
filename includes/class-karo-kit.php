@@ -23,6 +23,9 @@ final class Karo_Kit {
 	 */
 	const CRON_DAILY = 'karo_kit_daily';
 
+	/** Settings that belong to the kit itself rather than to any one module. */
+	const OPTION_GROUP = 'karo_kit';
+
 	/** Register a module class (must extend Karo_Kit_Module). */
 	public static function register( string $class ): void {
 		if ( is_subclass_of( $class, Karo_Kit_Module::class ) ) {
@@ -45,6 +48,7 @@ final class Karo_Kit {
 		add_action( 'admin_init', array( __CLASS__, 'handle_log_actions' ) );
 		Karo_Kit_Transfer::init();
 		Karo_Kit_Log::init();
+		Karo_Kit_Accent::init();
 		add_action( 'admin_init', array( __CLASS__, 'ensure_cron' ) );
 	}
 
@@ -83,7 +87,7 @@ final class Karo_Kit {
 
 	/** Option names registered to our modules' settings groups. */
 	private static function writable_options(): array {
-		$groups = array();
+		$groups = array( self::OPTION_GROUP );
 		foreach ( self::$modules as $class ) {
 			$groups[] = $class::option_group();
 		}
@@ -100,6 +104,23 @@ final class Karo_Kit {
 	/** @return array<string,class-string<Karo_Kit_Module>> */
 	public static function modules(): array {
 		return self::$modules;
+	}
+
+	/**
+	 * Kit-level settings that travel with an export, in the same shape modules
+	 * use. The accent travels as a *family name*, not a colour: "use this
+	 * site's primary" stays meaningful on a target site with its own palette,
+	 * where a copied hex would not.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function export_map(): array {
+		return array( Karo_Kit_Accent::SOURCE_OPT => 'value' );
+	}
+
+	/** @return array<string,string> */
+	public static function export_labels(): array {
+		return array( Karo_Kit_Accent::SOURCE_OPT => __( 'Accent colour source', 'karo-kit' ) );
 	}
 
 	/**
@@ -178,6 +199,11 @@ final class Karo_Kit {
 			file_exists( $js ) ? (string) filemtime( $js ) : KARO_KIT_VER,
 			true
 		);
+		$accent = Karo_Kit_Accent::inline_css();
+		if ( '' !== $accent ) {
+			wp_add_inline_style( 'karo-kit-admin', $accent );
+		}
+
 		wp_localize_script( 'karo-kit-admin', 'karoKitAutosave', array(
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'karo_kit_autosave' ),
@@ -431,6 +457,7 @@ final class Karo_Kit {
 		echo '</div>';
 
 		self::render_activity_card();
+		Karo_Kit_Accent::render_card();
 		Karo_Kit_Transfer::render_card();
 	}
 
