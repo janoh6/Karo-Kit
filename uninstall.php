@@ -28,8 +28,36 @@ $karo_kit_options = array(
 	'karo_kit_gate_hide_login',
 	'karo_kit_gate_login_slug',
 	'karo_kit_gate_denied_page',
+	// Activity log
+	'karo_kit_log',
+	// Etch — template board
+	'karo_kit_etch_order',
+	'karo_kit_etch_thumbs',
+	'karo_kit_etch_status',
+	'karo_kit_etch_board_on',
+	'karo_kit_etch_thumb_threshold',
+	'karo_kit_etch_migrated',
 );
 
 foreach ( $karo_kit_options as $karo_kit_option ) {
 	delete_option( $karo_kit_option );
+}
+
+/*
+ * Generated template thumbnails. Left in place if the standalone Etch Template
+ * Board plugin is still installed — the directory is shared with it, and
+ * deleting it here would take that plugin's images too.
+ */
+if ( ! defined( 'ETB_VERSION' ) ) {
+	$karo_kit_updir = wp_upload_dir();
+	$karo_kit_thumbs = trailingslashit( $karo_kit_updir['basedir'] ) . 'etb-thumbnails';
+	if ( is_dir( $karo_kit_thumbs ) ) {
+		foreach ( (array) glob( $karo_kit_thumbs . '/*' ) as $karo_kit_file ) {
+			if ( is_file( $karo_kit_file ) ) {
+				wp_delete_file( $karo_kit_file );
+			}
+		}
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.directory_rmdir
+		@rmdir( $karo_kit_thumbs );
+	}
 }

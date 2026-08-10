@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -31,6 +31,20 @@ Shortcodes for building the pages in Etch:
 * [karo_kit_message] - shows validation / error notices
 * [karo_kit_logout] - a logout link
 
+= Module 2 - Etch =
+
+Builder integration:
+
+* Template Board - replaces Etch's Templates screen with a board view: columns
+  mirrored from Etch's own grouping, drag-to-reorder, search, per-template
+  status (WIP / Review / Ready / Live), thumbnails, and a graph of shared
+  component usage. Create, open, delete and reset are delegated back to Etch's
+  native controls rather than reimplemented.
+* Reference - every dynamic-data binding and shortcode the kit exposes to Etch.
+
+Inert without Etch: the board's scripts self-gate on the Etch API, so nothing
+renders and nothing breaks on a site that doesn't run it.
+
 == Installation ==
 
 1. Upload the `karo-kit` folder to `/wp-content/plugins/`.
@@ -38,6 +52,25 @@ Shortcodes for building the pages in Etch:
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.7.0 =
+* Add: Module 2 — Etch. Bundles the Etch Template Board (kanban view of your
+  templates with columns, drag-to-reorder, search, status badges, thumbnails
+  and a shared-component graph), replacing Etch's native Templates screen
+  while create/open/delete still run through Etch's own controls.
+* Add: a switch to turn the Template Board on or off. On by default; off
+  returns Etch to its native Templates screen and unhooks the board entirely
+  (no assets, no REST routes, no per-save bookkeeping). Stored columns,
+  statuses and thumbnails are kept, so switching back on restores them.
+* Change: the Etch tab now belongs to this module and carries both the board's
+  settings and the dynamic-data / shortcode reference (previously under Gate).
+  Gate keeps Site Access and Maintenance.
+* Note: board state from the standalone "Etch Template Board" plugin (column
+  order, statuses, thumbnails) migrates automatically on first load. The old
+  options are left untouched, so that plugin still works if reactivated —
+  deactivate it to avoid running both boards at once.
+* Note: thumbnails come from WordPress.com mShots and need a publicly
+  reachable site; the Etch tab says so when the site is local.
 
 = 0.6.0 =
 * Change: Karo Kit moved out from under Settings to its own top-level admin

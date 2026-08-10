@@ -92,6 +92,23 @@ final class Karo_Kit {
 		return self::$modules;
 	}
 
+	/**
+	 * A toggle switch, for any module's settings.
+	 *
+	 * Still a real checkbox underneath — the visual is CSS on the sibling
+	 * track — so it posts, tabs and announces to assistive tech exactly as a
+	 * checkbox does.
+	 */
+	public static function switch_field( string $option, string $label, int $default = 0 ): void {
+		$on = (int) get_option( $option, $default );
+		printf(
+			'<label class="kk-switch"><input type="checkbox" name="%s" value="1" %s><span class="kk-switch__track"></span><span class="kk-switch__label">%s</span></label>',
+			esc_attr( $option ),
+			checked( 1, $on, false ),
+			esc_html( $label )
+		);
+	}
+
 	public static function add_menu(): void {
 		self::$hook = add_menu_page(
 			__( 'Karo Kit', 'karo-kit' ),
@@ -270,9 +287,13 @@ final class Karo_Kit {
 
 			echo '<div class="kk-card__header">';
 			echo '<span class="kk-card__title">' . esc_html( $group['label'] ) . '</span>';
+			$target = 'admin.php?page=karo-kit&tab=' . $group['module'];
+			if ( ! empty( $group['section'] ) ) {
+				$target .= '&section=' . $group['section'];
+			}
 			printf(
 				'<a class="kk-card__link" href="%s">%s</a>',
-				esc_url( admin_url( 'admin.php?page=karo-kit&tab=' . $group['module'] . '&section=' . $group['section'] ) ),
+				esc_url( admin_url( $target ) ),
 				esc_html__( 'Configure', 'karo-kit' )
 			);
 			echo '</div>';
@@ -439,6 +460,9 @@ final class Karo_Kit {
 
 	public static function activate(): void {
 		update_option( 'karo_kit_version', KARO_KIT_VER );
+		if ( class_exists( 'Karo_Kit_Etch_Board' ) ) {
+			Karo_Kit_Etch_Board::maybe_migrate();
+		}
 		do_action( 'karo_kit_activate' );
 	}
 

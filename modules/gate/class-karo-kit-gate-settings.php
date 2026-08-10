@@ -15,7 +15,6 @@ final class Karo_Kit_Gate_Settings {
 	const TABS = array(
 		'site-access' => 'Site Access',
 		'maintenance' => 'Maintenance',
-		'etch'        => 'Etch',
 	);
 
 	public static function init(): void {
@@ -69,19 +68,8 @@ final class Karo_Kit_Gate_Settings {
 				__( 'Maintenance', 'karo-kit' ),
 				__( 'Close the site to visitors while admins keep working.', 'karo-kit' ),
 			),
-			'etch'        => array(
-				__( 'Etch', 'karo-kit' ),
-				__( 'Dynamic data and shortcodes for building your pages in Etch.', 'karo-kit' ),
-			),
 		);
 		self::render_pagehead( $heads[ $active ][0], $heads[ $active ][1] );
-
-		if ( 'etch' === $active ) {
-			echo '<div class="kk-content"><section class="kk-card">';
-			do_settings_sections( 'karo-kit-gate-etch' );
-			echo '</section></div>';
-			return;
-		}
 
 		self::render_settings_form( 'karo-kit-gate-' . $active );
 	}
@@ -252,9 +240,6 @@ final class Karo_Kit_Gate_Settings {
 		add_settings_field( 'karo_kit_gate_maintenance_mode', __( 'Mode', 'karo-kit' ),
 			array( __CLASS__, 'field_maint_mode' ), 'karo-kit-gate-maintenance', 'karo_kit_gate_maintenance' );
 
-		// --- Section: Etch ---
-		add_settings_section( 'karo_kit_gate_etch', __( 'Etch Integration', 'karo-kit' ),
-			array( __CLASS__, 'section_etch_intro' ), 'karo-kit-gate-etch' );
 	}
 
 	/* ---- Section intros -------------------------------------------------- */
@@ -273,41 +258,6 @@ final class Karo_Kit_Gate_Settings {
 
 	public static function section_maintenance_intro(): void {
 		echo '<p>' . wp_kses_post( __( 'Users with <code>manage_options</code> always bypass the gate, so you can keep working on the live site. <strong>Coming soon</strong> returns HTTP 200 (indexable, for pre-launch). <strong>Maintenance</strong> returns 503 + Retry-After + noindex (for a live site that is temporarily down).', 'karo-kit' ) ) . '</p>';
-	}
-
-	public static function section_etch_intro(): void {
-		echo '<p>' . wp_kses_post( __( 'Bind these in Etch. The user values come from the <code>etch/dynamic_data/user</code> integration and appear under <strong>user</strong> in Etch&#8217;s dynamic data picker.', 'karo-kit' ) ) . '</p>';
-
-		$bindings = array(
-			array( '{user.isLoggedIn}', __( 'true / false — bind to a condition to show/hide login vs. account UI', 'karo-kit' ) ),
-			array( '{user.logoutUrl}', __( 'Logout link (redirects to the home page). Use as a link href.', 'karo-kit' ) ),
-			array( '{user.loginUrl}', __( 'Your selected login page', 'karo-kit' ) ),
-			array( '{user.accountUrl}', __( 'Your selected account page', 'karo-kit' ) ),
-			array( '{user.displayName}', __( 'Current user&#8217;s display name (empty when logged out)', 'karo-kit' ) ),
-			array( '{user.avatarUrl}', __( 'Avatar image URL (empty when logged out)', 'karo-kit' ) ),
-		);
-
-		echo '<table class="widefat striped" style="max-width:680px;margin-bottom:1em">';
-		echo '<thead><tr><th>' . esc_html__( 'Dynamic data', 'karo-kit' ) . '</th><th>' . esc_html__( 'Outputs', 'karo-kit' ) . '</th></tr></thead><tbody>';
-		foreach ( $bindings as $row ) {
-			echo '<tr><td><code>' . esc_html( $row[0] ) . '</code></td><td>' . esc_html( $row[1] ) . '</td></tr>';
-		}
-		echo '</tbody></table>';
-
-		$shortcodes = array(
-			array( '[karo_kit_field action="login"]', __( 'Nonce + redirect field — place inside your login form', 'karo-kit' ) ),
-			array( '[karo_kit_field action="register"]', __( 'Nonce + honeypot — place inside your registration form', 'karo-kit' ) ),
-			array( '[karo_kit_message]', __( 'Shows login / registration error notices', 'karo-kit' ) ),
-			array( '[karo_kit_logout]', __( 'A ready-made logout link', 'karo-kit' ) ),
-		);
-
-		echo '<p>' . esc_html__( 'Shortcodes (for spots where dynamic data is awkward):', 'karo-kit' ) . '</p>';
-		echo '<table class="widefat striped" style="max-width:680px">';
-		echo '<thead><tr><th>' . esc_html__( 'Shortcode', 'karo-kit' ) . '</th><th>' . esc_html__( 'Purpose', 'karo-kit' ) . '</th></tr></thead><tbody>';
-		foreach ( $shortcodes as $row ) {
-			echo '<tr><td><code>' . esc_html( $row[0] ) . '</code></td><td>' . esc_html( $row[1] ) . '</td></tr>';
-		}
-		echo '</tbody></table>';
 	}
 
 	/* ---- Field renderers ------------------------------------------------- */
@@ -353,22 +303,8 @@ final class Karo_Kit_Gate_Settings {
 		}
 	}
 
-	/**
-	 * A toggle switch. Still a real checkbox underneath — the visual is CSS on
-	 * the sibling track — so it posts, tabs and announces exactly as before.
-	 */
-	public static function switch_field( string $option, string $label ): void {
-		$on = (int) get_option( $option );
-		printf(
-			'<label class="kk-switch"><input type="checkbox" name="%s" value="1" %s><span class="kk-switch__track"></span><span class="kk-switch__label">%s</span></label>',
-			esc_attr( $option ),
-			checked( 1, $on, false ),
-			esc_html( $label )
-		);
-	}
-
 	public static function field_maint_on(): void {
-		self::switch_field( 'karo_kit_gate_maintenance_on', __( 'Enable the gate', 'karo-kit' ) );
+		Karo_Kit::switch_field( 'karo_kit_gate_maintenance_on', __( 'Enable the gate', 'karo-kit' ) );
 	}
 
 	public static function field_maint_mode(): void {
@@ -386,7 +322,7 @@ final class Karo_Kit_Gate_Settings {
 	}
 
 	public static function field_registration_on(): void {
-		self::switch_field( 'karo_kit_gate_registration_on', __( 'Allow visitors to register via the registration page', 'karo-kit' ) );
+		Karo_Kit::switch_field( 'karo_kit_gate_registration_on', __( 'Allow visitors to register via the registration page', 'karo-kit' ) );
 	}
 
 	public static function field_number( array $args ): void {
@@ -398,7 +334,7 @@ final class Karo_Kit_Gate_Settings {
 	}
 
 	public static function field_hide_login(): void {
-		self::switch_field( 'karo_kit_gate_hide_login', __( 'Block wp-login.php and wp-admin unless the secret word is used', 'karo-kit' ) );
+		Karo_Kit::switch_field( 'karo_kit_gate_hide_login', __( 'Block wp-login.php and wp-admin unless the secret word is used', 'karo-kit' ) );
 		echo '<p class="description">' . wp_kses_post( __( 'Obscurity, not a lock — keep rate limiting on too. Recovery if locked out: add <code>define( \'KARO_KIT_DISABLE_HIDE_LOGIN\', true );</code> to wp-config.php, or deactivate the plugin.', 'karo-kit' ) ) . '</p>';
 	}
 

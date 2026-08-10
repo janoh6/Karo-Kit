@@ -486,6 +486,39 @@ body.karo-kit-app .kk-app *::after {
 	font-weight: 600;
 }
 
+/* Reference tables pair a token with prose, so they need more room than the
+   label/value tables the 640px cap is for. */
+.kk-table--wide {
+	max-width: 100%;
+}
+
+.kk-table--wide td:last-child {
+	text-align: left;
+	font-weight: 400;
+	color: var( --kk-muted );
+}
+
+.kk-table--wide code {
+	padding: 2px 6px;
+	border-radius: 5px;
+	background: var( --kk-canvas );
+	font-size: var( --kk-text-xs );
+	color: var( --kk-ink );
+}
+
+.kk-notice {
+	margin: 0;
+	padding: 12px 14px;
+	border-radius: var( --kk-radius-sm );
+	font-size: var( --kk-text-sm );
+	line-height: 1.5;
+}
+
+.kk-notice--warn {
+	background: #fff8e6;
+	color: #7a5200;
+}
+
 .kk-table__unset {
 	color: #b6b4ac;
 	font-weight: 500 !important;

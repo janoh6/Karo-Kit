@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Karo Kit
  * Plugin URI:        https://karo.ioannesa.com/
- * Description:       Modular site-utility kit for Etch / ACSS WordPress builds. Module 1 — Gate: front-end login & registration plus a maintenance / coming-soon gate, all wired to pages you pick from dropdowns.
- * Version:           0.6.0
+ * Description:       Modular site-utility kit for Etch / ACSS WordPress builds. Gate: front-end login & registration plus a maintenance / coming-soon gate, wired to pages you pick from dropdowns. Etch: a Template Board replacing the native Templates screen, plus the dynamic-data and shortcode reference.
+ * Version:           0.7.0
  * Author:            Karo
  * License:           GPL-2.0-or-later
  * Text Domain:       karo-kit
@@ -41,7 +41,7 @@ if ( version_compare( PHP_VERSION, $karo_kit_php_min, '<' )
 	return;
 }
 
-define( 'KARO_KIT_VER', '0.6.0' );
+define( 'KARO_KIT_VER', '0.7.0' );
 define( 'KARO_KIT_FILE', __FILE__ );
 define( 'KARO_KIT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'KARO_KIT_URL', plugin_dir_url( __FILE__ ) );
@@ -62,8 +62,14 @@ require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-maintenance.php';
 require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-shortcodes.php';
 require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-etch.php';
 
+/* ---- Module: Etch -------------------------------------------------------- */
+require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch-board.php';
+require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch-settings.php';
+require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch.php';
+
 // Register modules with the core. Future modules add one line here.
 Karo_Kit::register( 'Karo_Kit_Gate' );
+Karo_Kit::register( 'Karo_Kit_Etch' );
 
 // Boot once all plugins are loaded.
 add_action( 'plugins_loaded', static function () {
