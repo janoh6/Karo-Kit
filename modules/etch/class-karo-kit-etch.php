@@ -35,6 +35,49 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 		Karo_Kit_Etch_Board::init();
 		Karo_Kit_Etch_Structure::init();
 		Karo_Kit_Etch_Settings::init();
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_loader' ) );
+	}
+
+	/**
+	 * Ship one small loader on the front end; it pulls in the real assets only
+	 * once the Etch API is present. Each feature decides whether it wants in.
+	 */
+	public static function enqueue_loader(): void {
+		$bundles = array();
+		$styles  = array();
+
+		foreach ( array( 'Karo_Kit_Etch_Board', 'Karo_Kit_Etch_Structure' ) as $feature ) {
+			$bundle = $feature::loader_bundle();
+			if ( ! $bundle ) {
+				continue;
+			}
+			if ( ! empty( $bundle['styles'] ) ) {
+				$styles = array_merge( $styles, $bundle['styles'] );
+				unset( $bundle['styles'] );
+			}
+			$bundles[] = $bundle;
+		}
+
+		if ( ! $bundles ) {
+			return; // nothing enabled for this visitor — not even the loader
+		}
+
+		$js = KARO_KIT_DIR . 'assets/etch/loader.js';
+		wp_enqueue_script(
+			'karo-kit-etch-loader',
+			KARO_KIT_URL . 'assets/etch/loader.js',
+			array(),
+			file_exists( $js ) ? (string) filemtime( $js ) : KARO_KIT_VER,
+			true
+		);
+		wp_add_inline_script(
+			'karo-kit-etch-loader',
+			'window.KaroKitEtchLoader = ' . wp_json_encode( array(
+				'styles'  => $styles,
+				'bundles' => $bundles,
+			) ) . ';',
+			'before'
+		);
 	}
 
 	public static function render_page(): void {

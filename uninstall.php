@@ -30,6 +30,8 @@ $karo_kit_options = array(
 	'karo_kit_gate_denied_page',
 	// Activity log
 	'karo_kit_log',
+	'karo_kit_log_db_version',
+	'karo_kit_gate_throttle_db_version',
 	// Etch — template board
 	'karo_kit_etch_order',
 	'karo_kit_etch_thumbs',
@@ -47,6 +49,16 @@ $karo_kit_options = array(
 foreach ( $karo_kit_options as $karo_kit_option ) {
 	delete_option( $karo_kit_option );
 }
+
+// The activity log has its own table.
+global $wpdb;
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'karo_kit_log' );
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+$wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'karo_kit_throttle' );
+
+wp_clear_scheduled_hook( 'karo_kit_log_trim' );
+wp_clear_scheduled_hook( 'karo_kit_daily' );
 
 // Per-user leftovers: the import review stash and the dashboard theme choice.
 foreach ( get_users( array( 'fields' => 'ID' ) ) as $karo_kit_user ) {

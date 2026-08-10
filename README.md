@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.9.0
+Stable tag: 0.10.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -63,6 +63,28 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.10.0 =
+* Fix: the activity log made brute-force attacks more expensive to absorb than
+  no logging at all. Every failed login and blocked request read the whole
+  200-entry log, unserialised it, prepended, re-serialised and wrote back a
+  ~27KB blob. It now lives in its own table, so an append is one INSERT and
+  retention is a daily DELETE instead of work on every write. Existing entries
+  migrate automatically.
+* Fix: rate-limit state lived in transients, which a persistent object cache
+  can evict under memory pressure and any cache-purge plugin can wipe —
+  silently dropping an active lockout. Attempt counters and locks now live in
+  their own table. IPs are stored hashed; the table counts abuse and doesn't
+  need readable addresses to do it.
+* Change: a sustained attack no longer writes one log row per attempt. The
+  first failure and the resulting lockout are recorded; the attempts between
+  them are suppressed. Fifty failures produce two rows, not fifty.
+* Performance: the Etch board and structure arrows shipped ~94KB of JS/CSS on
+  every front-end page view for anyone who can edit, purely so they could
+  no-op when not on the builder. A ~2.6KB loader now waits for the Etch API
+  and injects the real assets only then — a 97% cut to the always-on payload.
+* Housekeeping: log retention and rate-limit cleanup share one daily event
+  rather than scheduling one each. Both tables are dropped on uninstall.
 
 = 0.9.0 =
 * Add: settings export / import, from a card on the Dashboard. Export writes a

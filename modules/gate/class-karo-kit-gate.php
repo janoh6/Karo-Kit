@@ -31,6 +31,7 @@ final class Karo_Kit_Gate extends Karo_Kit_Module {
 	}
 
 	public static function init(): void {
+		Karo_Kit_Gate_Security::init();
 		Karo_Kit_Gate_Settings::init();
 		Karo_Kit_Gate_Auth::init();
 		Karo_Kit_Gate_Maintenance::init();

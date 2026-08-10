@@ -51,7 +51,6 @@ final class Karo_Kit_Etch_Board {
 		}
 
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
-		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 
 		// Standalone template preview used as the thumbnail screenshot target.
 		add_filter( 'query_vars', static function ( $vars ) {
@@ -112,31 +111,45 @@ final class Karo_Kit_Etch_Board {
 	/* ---- Assets ---------------------------------------------------------- */
 
 	/**
-	 * The Etch builder is a front-end route, so this hooks wp_enqueue_scripts
-	 * (never an admin-only hook). No server-side route detection — that is
-	 * brittle. The scripts self-gate at runtime: board.js no-ops unless
-	 * window.etch exists and the current place is "templates", which is also
-	 * what keeps this inert on sites without Etch.
+	 * What the loader should fetch once it sees the Etch API, or null if the
+	 * board shouldn't run for this request.
+	 *
+	 * These assets are not enqueued directly: the builder is a front-end route
+	 * with no reliable server-side marker, so enqueueing meant shipping them on
+	 * every front-end page just to no-op. See assets/etch/loader.js.
 	 */
-	public static function enqueue_assets(): void {
+	public static function loader_bundle(): ?array {
+		// The switch is checked here as well as in init(): the loader asks every
+		// feature directly, so init()'s early return no longer gates assets.
+		if ( ! self::enabled() ) {
+			return null;
+		}
 		if ( ! is_user_logged_in() || ! current_user_can( self::CAP ) ) {
-			return;
+			return null;
 		}
 
 		/** Filter whether the board assets load for this request. */
 		if ( ! apply_filters( 'karo_kit_etch_should_enqueue', true ) ) {
-			return;
+			return null;
 		}
 
-		// Bridge first (exposes the bridge global), then the board that consumes it.
-		wp_enqueue_style( 'karo-kit-etch-board', KARO_KIT_URL . 'assets/etch/board.css', array(), KARO_KIT_VER );
-		wp_enqueue_script( 'karo-kit-etch-bridge', KARO_KIT_URL . 'assets/etch/bridge.js', array(), KARO_KIT_VER, true );
-		wp_enqueue_script( 'karo-kit-etch-board', KARO_KIT_URL . 'assets/etch/board.js', array( 'karo-kit-etch-bridge' ), KARO_KIT_VER, true );
+		$v = '?ver=' . rawurlencode( KARO_KIT_VER );
 
-		wp_localize_script( 'karo-kit-etch-board', 'KaroKitEtchData', array(
-			'restBase' => esc_url_raw( rest_url( self::REST_NAMESPACE . '/etch' ) ),
-			'nonce'    => wp_create_nonce( 'wp_rest' ),
-		) );
+		return array(
+			'styles'  => array( KARO_KIT_URL . 'assets/etch/board.css' . $v ),
+			'data'    => array(
+				'name'  => 'KaroKitEtchData',
+				'value' => array(
+					'restBase' => esc_url_raw( rest_url( self::REST_NAMESPACE . '/etch' ) ),
+					'nonce'    => wp_create_nonce( 'wp_rest' ),
+				),
+			),
+			// Bridge first (exposes the bridge global), then the board that consumes it.
+			'scripts' => array(
+				KARO_KIT_URL . 'assets/etch/bridge.js' . $v,
+				KARO_KIT_URL . 'assets/etch/board.js' . $v,
+			),
+		);
 	}
 
 	/* ---- REST ------------------------------------------------------------ */

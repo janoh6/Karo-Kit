@@ -17,6 +17,12 @@ final class Karo_Kit {
 	/** Hook suffix of our admin page, set once add_menu_page() runs. */
 	private static string $hook = '';
 
+	/**
+	 * One daily maintenance event that features attach their housekeeping to,
+	 * rather than each scheduling its own.
+	 */
+	const CRON_DAILY = 'karo_kit_daily';
+
 	/** Register a module class (must extend Karo_Kit_Module). */
 	public static function register( string $class ): void {
 		if ( is_subclass_of( $class, Karo_Kit_Module::class ) ) {
@@ -38,6 +44,8 @@ final class Karo_Kit {
 		// callback fires far too late to send headers.
 		add_action( 'admin_init', array( __CLASS__, 'handle_log_actions' ) );
 		Karo_Kit_Transfer::init();
+		Karo_Kit_Log::init();
+		add_action( 'admin_init', array( __CLASS__, 'ensure_cron' ) );
 	}
 
 	/**
@@ -559,8 +567,18 @@ final class Karo_Kit {
 		);
 	}
 
+	/** Idempotent; also covers in-place updates, which skip activation. */
+	public static function ensure_cron(): void {
+		if ( ! wp_next_scheduled( self::CRON_DAILY ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::CRON_DAILY );
+		}
+	}
+
 	public static function activate(): void {
 		update_option( 'karo_kit_version', KARO_KIT_VER );
+		Karo_Kit_Log::install();
+		Karo_Kit_Gate_Security::install();
+		self::ensure_cron();
 		if ( class_exists( 'Karo_Kit_Etch_Board' ) ) {
 			Karo_Kit_Etch_Board::maybe_migrate();
 		}
@@ -568,6 +586,7 @@ final class Karo_Kit {
 	}
 
 	public static function deactivate(): void {
+		wp_clear_scheduled_hook( self::CRON_DAILY );
 		do_action( 'karo_kit_deactivate' );
 	}
 }
