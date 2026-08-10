@@ -764,9 +764,12 @@ body.karo-kit-app .kk-app *::after {
 	line-height: 1.5;
 }
 
-.kk-card input[type="text"],
-.kk-card input[type="number"],
-.kk-card select {
+/* Scoped to .kk-app rather than .kk-card so every control in our UI is
+   covered, and specific enough to beat WP core's `select { color: #1e1e1e;
+   background-color: #fff }`. */
+.kk-app input[type="text"],
+.kk-app input[type="number"],
+.kk-app select {
 	font-family: inherit;
 	font-size: var( --kk-text-sm );
 	max-width: 100%;
@@ -780,18 +783,39 @@ body.karo-kit-app .kk-app *::after {
 	box-shadow: none;
 }
 
-.kk-card select {
+/*
+ * Options need their own colours. They inherit nothing useful — the background
+ * computes to transparent — which leaves the dropdown's appearance entirely to
+ * how the browser paints its popup. On a dark theme that can land as dark text
+ * on a dark popup, i.e. an unreadable list. Stating both ends the guesswork.
+ */
+.kk-app select option,
+.kk-app select optgroup {
+	background-color: var( --kk-input-bg );
+	color: var( --kk-ink );
+}
+
+.kk-app select optgroup {
+	font-weight: 700;
+	color: var( --kk-muted );
+}
+
+.kk-app select option {
+	font-weight: 400;
+}
+
+.kk-app select {
 	/* WP core sets a 30px min-height on admin selects; override it. */
 	height: auto;
 	padding-right: 24px;
 }
 
-.kk-card input[type="text"].regular-text {
+.kk-app input[type="text"].regular-text {
 	width: 320px;
 }
 
-.kk-card input:focus,
-.kk-card select:focus {
+.kk-app input:focus,
+.kk-app select:focus {
 	border-color: var( --kk-accent );
 	outline: none;
 	box-shadow: 0 0 0 2px rgba( 255, 176, 32, 0.28 );

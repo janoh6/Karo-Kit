@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.11.0
+Stable tag: 0.11.1
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,16 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.11.1 =
+* Fix: dropdown options were unreadable in dark mode. Only the closed select
+  was styled, so options and group labels kept a transparent background and
+  their appearance was left to however the browser paints its popup. Both now
+  carry explicit colours, measured at 14.8:1 for options and 6.5:1 for group
+  labels against WCAG AA's 4.5:1.
+* Change: form-control styling moved from .kk-card to .kk-app scope. It only
+  ever reached controls inside a card, so any select added elsewhere would
+  have silently fallen back to WordPress core's white-on-white.
 
 = 0.11.0 =
 * Add: Sidebar Tabs in the Etch module — collapse either builder panel to free
