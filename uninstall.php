@@ -42,6 +42,8 @@ $karo_kit_options = array(
 	'karo_kit_etch_structure_dwell',
 	'karo_kit_etch_structure_placement',
 	'karo_kit_etch_structure_show_disabled',
+	'karo_kit_etch_sidebar_on',
+	'karo_kit_etch_sidebar_remember',
 	'karo_kit_etch_migrated',
 	// Import review stash is a transient, cleaned up separately below.
 );

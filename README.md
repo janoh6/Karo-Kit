@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.10.0
+Stable tag: 0.11.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -43,6 +43,9 @@ Builder integration:
 * Structure Arrows - hover a row in the structure panel to get up / down
   arrows for reordering among siblings; keep hovering and outdent / indent
   arrows appear for changing nesting depth. Only valid moves are drawn.
+* Sidebar Tabs - a draggable tab on each edge of the builder that collapses the
+  panel beside it, with Alt+[ , Alt+] and Alt+\\ shortcuts. Panels reopen at
+  whatever width you resized them to.
 * Reference - every dynamic-data binding and shortcode the kit exposes to Etch.
 
 Each feature has its own on/off switch. Inert without Etch: the scripts
@@ -63,6 +66,23 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.11.0 =
+* Add: Sidebar Tabs in the Etch module — collapse either builder panel to free
+  up canvas, by tab or by keyboard (Alt+[ , Alt+] , Alt+\\). Draggable, with
+  its own on/off switch and an option for whether state persists between
+  sessions.
+* Performance: Etch assets are now gated on the builder route itself rather
+  than loaded everywhere to no-op. Etch opens the builder at the front page
+  with ?etch=magic and gates its own app on exactly that, so ordinary
+  front-end pages now carry nothing at all — not even the loader.
+* Fix: the Etch features required edit_posts while Etch itself requires
+  manage_options to render the builder, so authors were served assets for a
+  builder that would never load for them. Now matched to Etch's own bar.
+* Fixed while porting the sidebar snippet: a remounted panel left its old tab
+  orphaned in the DOM and grew a new one each time; startup waited on
+  DOMContentLoaded, which has already fired by the time the loader injects the
+  script; and shortcuts could act on a panel Etch had since removed.
 
 = 0.10.0 =
 * Fix: the activity log made brute-force attacks more expensive to absorb than

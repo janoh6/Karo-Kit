@@ -1,0 +1,69 @@
+/*
+ * sidebar.css — collapse/expand tabs for the Etch builder's side panels.
+ *
+ * Ported from the "Etch Sidebar Toggle" snippet. Only the tab itself is ours;
+ * the collapse works by constraining Etch's own .etch-sidebar, so the panel
+ * keeps whatever width it was resized to when it reopens.
+ */
+
+.etch-sidebar {
+	transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, opacity 0.15s ease;
+}
+
+.etch-sidebar.kk-sidebar--collapsed {
+	width: 0 !important;
+	min-width: 0 !important;
+	max-width: 0 !important;
+	opacity: 0;
+	overflow: hidden !important;
+	pointer-events: none;
+}
+
+.kk-sidebar-tab {
+	position: fixed;
+	top: 50%;
+	transform: translateY( -50% );
+	z-index: 100000;
+	width: 20px;
+	height: 56px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: none;
+	background: #ffb020;
+	color: #1a1a1d;
+	cursor: grab;
+	box-shadow: 0 1px 4px rgba( 0, 0, 0, 0.3 );
+	touch-action: none;
+}
+
+.kk-sidebar-tab:focus-visible {
+	outline: 2px solid #ffb020;
+	outline-offset: 2px;
+}
+
+.kk-sidebar-tab--dragging {
+	cursor: grabbing;
+	transition: none;
+}
+
+.kk-sidebar-tab[data-side="left"] {
+	left: 0;
+	border-radius: 0 6px 6px 0;
+}
+
+.kk-sidebar-tab[data-side="right"] {
+	right: 0;
+	border-radius: 6px 0 0 6px;
+}
+
+.kk-sidebar-tab svg {
+	width: 12px;
+	height: 12px;
+	transition: transform 0.2s ease;
+}
+
+.kk-sidebar-tab[data-collapsed="true"] svg {
+	transform: rotate( 180deg );
+}

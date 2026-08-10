@@ -27,9 +27,6 @@ final class Karo_Kit_Etch_Structure {
 	const PLACEMENT_OPT = 'karo_kit_etch_structure_placement';
 	const DISABLED_OPT  = 'karo_kit_etch_structure_show_disabled';
 
-	/** Capability to use the arrows — the same one Etch requires to build. */
-	const CAP = 'edit_posts';
-
 	const PLACEMENTS = array( 'prepend', 'append' );
 
 	/**
@@ -73,9 +70,6 @@ final class Karo_Kit_Etch_Structure {
 	 */
 	public static function loader_bundle(): ?array {
 		if ( ! self::enabled() ) {
-			return null;
-		}
-		if ( ! is_user_logged_in() || ! current_user_can( self::CAP ) ) {
 			return null;
 		}
 

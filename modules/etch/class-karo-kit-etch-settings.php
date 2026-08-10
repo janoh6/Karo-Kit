@@ -15,6 +15,7 @@ final class Karo_Kit_Etch_Settings {
 		add_action( 'admin_init', array( __CLASS__, 'register' ) );
 		Karo_Kit::on_option_change( Karo_Kit_Etch_Board::ENABLED_OPT, array( __CLASS__, 'log_board_toggle' ) );
 		Karo_Kit::on_option_change( Karo_Kit_Etch_Structure::ENABLED_OPT, array( __CLASS__, 'log_structure_toggle' ) );
+		Karo_Kit::on_option_change( Karo_Kit_Etch_Sidebar::ENABLED_OPT, array( __CLASS__, 'log_sidebar_toggle' ) );
 	}
 
 	public static function log_board_toggle( $new ): void {
@@ -28,6 +29,13 @@ final class Karo_Kit_Etch_Settings {
 		Karo_Kit_Log::add(
 			'etch_structure',
 			$new ? __( 'Structure arrows enabled', 'karo-kit' ) : __( 'Structure arrows disabled', 'karo-kit' )
+		);
+	}
+
+	public static function log_sidebar_toggle( $new ): void {
+		Karo_Kit_Log::add(
+			'etch_sidebar',
+			$new ? __( 'Sidebar tabs enabled', 'karo-kit' ) : __( 'Sidebar tabs disabled', 'karo-kit' )
 		);
 	}
 
@@ -89,6 +97,26 @@ final class Karo_Kit_Etch_Settings {
 			array( __CLASS__, 'field_placement' ), $slug, 'karo_kit_etch_structure' );
 		add_settings_field( Karo_Kit_Etch_Structure::DISABLED_OPT, __( 'Unavailable moves', 'karo-kit' ),
 			array( __CLASS__, 'field_show_disabled' ), $slug, 'karo_kit_etch_structure' );
+
+		// --- Section: Sidebar Tabs ---
+		register_setting( $group, Karo_Kit_Etch_Sidebar::ENABLED_OPT, array(
+			'type'              => 'boolean',
+			'sanitize_callback' => static fn( $v ) => $v ? 1 : 0,
+			'default'           => 1,
+		) );
+		register_setting( $group, Karo_Kit_Etch_Sidebar::REMEMBER_OPT, array(
+			'type'              => 'boolean',
+			'sanitize_callback' => static fn( $v ) => $v ? 1 : 0,
+			'default'           => 1,
+		) );
+
+		add_settings_section( 'karo_kit_etch_sidebar', __( 'Sidebar Tabs', 'karo-kit' ),
+			array( __CLASS__, 'section_sidebar_intro' ), $slug );
+
+		add_settings_field( Karo_Kit_Etch_Sidebar::ENABLED_OPT, __( 'Sidebar tabs', 'karo-kit' ),
+			array( __CLASS__, 'field_sidebar_on' ), $slug, 'karo_kit_etch_sidebar' );
+		add_settings_field( Karo_Kit_Etch_Sidebar::REMEMBER_OPT, __( 'Remember state', 'karo-kit' ),
+			array( __CLASS__, 'field_sidebar_remember' ), $slug, 'karo_kit_etch_sidebar' );
 
 		// --- Section: Reference (no fields, just a help panel) ---
 		add_settings_section( 'karo_kit_etch_reference', __( 'Reference', 'karo-kit' ),
@@ -229,6 +257,40 @@ final class Karo_Kit_Etch_Settings {
 	public static function sanitize_placement( $v ): string {
 		$v = sanitize_key( (string) $v );
 		return in_array( $v, Karo_Kit_Etch_Structure::PLACEMENTS, true ) ? $v : 'prepend';
+	}
+
+	/* ---- Sidebar Tabs ----------------------------------------------------- */
+
+	public static function section_sidebar_intro(): void {
+		echo '<p>' . esc_html__( 'Puts a small tab on each edge of the builder that collapses the panel beside it, for more canvas on a narrow screen. Panels reopen at whatever width you had resized them to, and the tabs can be dragged up and down.', 'karo-kit' ) . '</p>';
+
+		$shortcuts = array(
+			array( 'Alt + [', __( 'Collapse / expand the left panel', 'karo-kit' ) ),
+			array( 'Alt + ]', __( 'Collapse / expand the right panel', 'karo-kit' ) ),
+			array( 'Alt + \\', __( 'Hide both, or bring both back', 'karo-kit' ) ),
+		);
+		echo '<table class="kk-table kk-table--wide"><tbody>';
+		foreach ( $shortcuts as $row ) {
+			echo '<tr><td><code>' . esc_html( $row[0] ) . '</code></td><td>' . esc_html( $row[1] ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+	}
+
+	public static function field_sidebar_on(): void {
+		Karo_Kit::switch_field(
+			Karo_Kit_Etch_Sidebar::ENABLED_OPT,
+			__( 'Show collapse tabs on the builder panels', 'karo-kit' ),
+			1
+		);
+	}
+
+	public static function field_sidebar_remember(): void {
+		Karo_Kit::switch_field(
+			Karo_Kit_Etch_Sidebar::REMEMBER_OPT,
+			__( 'Keep panels as you left them between sessions', 'karo-kit' ),
+			1
+		);
+		echo '<p class="description">' . esc_html__( 'Off means the builder always opens with both panels showing, and the tabs back at their default position.', 'karo-kit' ) . '</p>';
 	}
 
 	/** Best-effort: does this host look publicly reachable? */

@@ -36,9 +36,6 @@ final class Karo_Kit_Etch_Board {
 
 	const STATUSES = array( 'wip', 'review', 'ready', 'live' );
 
-	/** Capability to use the board — the same one Etch requires to build. */
-	const CAP = 'edit_posts';
-
 	public static function init(): void {
 		// Migration runs whether or not the board is enabled — turning the
 		// feature off must never strand data. In-place plugin updates don't
@@ -124,9 +121,6 @@ final class Karo_Kit_Etch_Board {
 		if ( ! self::enabled() ) {
 			return null;
 		}
-		if ( ! is_user_logged_in() || ! current_user_can( self::CAP ) ) {
-			return null;
-		}
 
 		/** Filter whether the board assets load for this request. */
 		if ( ! apply_filters( 'karo_kit_etch_should_enqueue', true ) ) {
@@ -206,7 +200,7 @@ final class Karo_Kit_Etch_Board {
 	}
 
 	public static function can_edit(): bool {
-		return current_user_can( self::CAP );
+		return current_user_can( Karo_Kit_Etch::CAP );
 	}
 
 	public static function get_threshold(): int {

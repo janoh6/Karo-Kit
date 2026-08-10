@@ -2,17 +2,20 @@
 /**
  * Etch module — builder integration.
  *
- * Two concerns live here:
+ * Three builder features plus a reference panel:
  *  - Template Board: replaces Etch's native Templates screen with a board view
  *    (columns, reorder, search, thumbnails, graph), delegating create/delete/
  *    open back to Etch's own flow.
  *  - Structure Arrows: hover-reveal up/down/outdent/indent controls in the
  *    structure panel, so blocks can be reordered without dragging.
+ *  - Sidebar Tabs: collapse either builder panel to free up canvas.
  *  - Reference: the dynamic-data bindings and shortcodes other modules expose
  *    to the Etch builder.
  *
- * Inert without Etch: both features' scripts self-gate on window.etch, and
- * the REST routes simply go unused.
+ * None of it ships outside the builder: is_builder_request() matches Etch's own
+ * route test, so ordinary front-end pages carry nothing at all. The loader's
+ * runtime check for window.etch remains as a timing guard — the API isn't
+ * necessarily ready the moment the page is parsed.
  *
  * @package Karo_Kit\Etch
  */
@@ -31,11 +34,42 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 		return __( 'Etch', 'karo-kit' );
 	}
 
+	/**
+	 * Capability required to use any Etch feature.
+	 *
+	 * Matched to Etch's own bar rather than set independently: its renderer
+	 * gates the builder on manage_options, so anything looser would ship assets
+	 * to users the builder will never load for.
+	 */
+	const CAP = 'manage_options';
+
 	public static function init(): void {
 		Karo_Kit_Etch_Board::init();
 		Karo_Kit_Etch_Structure::init();
+		Karo_Kit_Etch_Sidebar::init();
 		Karo_Kit_Etch_Settings::init();
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_loader' ) );
+	}
+
+	public static function user_can(): bool {
+		return is_user_logged_in() && current_user_can( self::CAP );
+	}
+
+	/**
+	 * Is this request the Etch builder?
+	 *
+	 * Etch opens the builder at home_url('/') with ?etch=magic, and gates its
+	 * own app on exactly this pair of conditions (see Etch's AppRenderer). Using
+	 * the same test means our assets are absent everywhere else, rather than
+	 * shipped everywhere and left to no-op at runtime.
+	 */
+	public static function is_builder_request(): bool {
+		$is_builder = is_front_page()
+			&& isset( $_GET['etch'] ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			&& 'magic' === $_GET['etch']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		/** Filter the builder-route test, should Etch's routing ever change. */
+		return (bool) apply_filters( 'karo_kit_etch_is_builder', $is_builder );
 	}
 
 	/**
@@ -43,10 +77,15 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 	 * once the Etch API is present. Each feature decides whether it wants in.
 	 */
 	public static function enqueue_loader(): void {
+		// Nothing at all on ordinary pages — not even the loader.
+		if ( ! self::is_builder_request() || ! self::user_can() ) {
+			return;
+		}
+
 		$bundles = array();
 		$styles  = array();
 
-		foreach ( array( 'Karo_Kit_Etch_Board', 'Karo_Kit_Etch_Structure' ) as $feature ) {
+		foreach ( array( 'Karo_Kit_Etch_Board', 'Karo_Kit_Etch_Structure', 'Karo_Kit_Etch_Sidebar' ) as $feature ) {
 			$bundle = $feature::loader_bundle();
 			if ( ! $bundle ) {
 				continue;
@@ -101,6 +140,8 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 			Karo_Kit_Etch_Structure::DWELL_OPT     => 'value',
 			Karo_Kit_Etch_Structure::PLACEMENT_OPT => 'value',
 			Karo_Kit_Etch_Structure::DISABLED_OPT  => 'value',
+			Karo_Kit_Etch_Sidebar::ENABLED_OPT     => 'value',
+			Karo_Kit_Etch_Sidebar::REMEMBER_OPT    => 'value',
 		);
 	}
 
@@ -115,6 +156,8 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 			Karo_Kit_Etch_Structure::DWELL_OPT     => __( 'Dwell delay', 'karo-kit' ),
 			Karo_Kit_Etch_Structure::PLACEMENT_OPT => __( 'Arrow position', 'karo-kit' ),
 			Karo_Kit_Etch_Structure::DISABLED_OPT  => __( 'Show unavailable moves', 'karo-kit' ),
+			Karo_Kit_Etch_Sidebar::ENABLED_OPT     => __( 'Sidebar tabs', 'karo-kit' ),
+			Karo_Kit_Etch_Sidebar::REMEMBER_OPT    => __( 'Remember panel state', 'karo-kit' ),
 		);
 	}
 
@@ -132,6 +175,11 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 				'label' => __( 'Structure arrows', 'karo-kit' ),
 				'value' => $arrows_on ? __( 'On', 'karo-kit' ) : __( 'Off', 'karo-kit' ),
 				'on'    => $arrows_on,
+			),
+			array(
+				'label' => __( 'Sidebar tabs', 'karo-kit' ),
+				'value' => Karo_Kit_Etch_Sidebar::enabled() ? __( 'On', 'karo-kit' ) : __( 'Off', 'karo-kit' ),
+				'on'    => Karo_Kit_Etch_Sidebar::enabled(),
 			),
 		);
 
