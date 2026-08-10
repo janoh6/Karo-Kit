@@ -32,12 +32,11 @@ final class Karo_Kit_Etch_Structure {
 
 	const PLACEMENTS = array( 'prepend', 'append' );
 
-	public static function init(): void {
-		if ( ! self::enabled() ) {
-			return;
-		}
-		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
-	}
+	/**
+	 * Nothing to hook: the arrows are pure front-end behaviour, delivered by
+	 * the module's loader. See loader_bundle().
+	 */
+	public static function init(): void {}
 
 	/** Is the feature switched on? Defaults to on — it is additive and reversible. */
 	public static function enabled(): bool {
@@ -59,40 +58,49 @@ final class Karo_Kit_Etch_Structure {
 	}
 
 	/**
-	 * The Etch builder is a front-end route, so this is a front-end enqueue
-	 * gated on capability — ordinary visitors never receive the scripts.
+	 * What the loader should fetch once it sees the Etch API, or null if the
+	 * arrows shouldn't run for this request.
+	 *
+	 * Not enqueued directly — see assets/etch/loader.js for why. The options
+	 * travel as real JSON rather than through wp_localize_script(), which
+	 * stringifies scalars and would turn the delay into "700" and the boolean
+	 * into "1"/"".
 	 *
 	 * The standalone plugin also enqueued on every admin screen "in case a
 	 * future Etch build loads the builder there". That is dropped: it shipped
-	 * three scripts to every wp-admin page for every editor, and the boot
-	 * script would poll ~10s before warning to the console each time. If Etch
-	 * ever moves into wp-admin, add the hook back then.
+	 * three scripts to every wp-admin page for every editor. If Etch ever moves
+	 * into wp-admin, add it back then.
 	 */
-	public static function enqueue_assets(): void {
+	public static function loader_bundle(): ?array {
+		if ( ! self::enabled() ) {
+			return null;
+		}
 		if ( ! is_user_logged_in() || ! current_user_can( self::CAP ) ) {
-			return;
+			return null;
 		}
 
 		/** Filter whether the structure arrows load for this request. */
 		if ( ! apply_filters( 'karo_kit_etch_structure_should_enqueue', true ) ) {
-			return;
+			return null;
 		}
 
-		// Dependency order: logic -> render -> boot.
-		wp_enqueue_script( 'karo-kit-etch-structure', KARO_KIT_URL . 'assets/etch/structure.js', array(), KARO_KIT_VER, true );
-		wp_enqueue_script( 'karo-kit-etch-structure-render', KARO_KIT_URL . 'assets/etch/structure-render.js', array( 'karo-kit-etch-structure' ), KARO_KIT_VER, true );
-		wp_enqueue_script( 'karo-kit-etch-structure-boot', KARO_KIT_URL . 'assets/etch/structure-boot.js', array( 'karo-kit-etch-structure-render' ), KARO_KIT_VER, true );
+		$v = '?ver=' . rawurlencode( KARO_KIT_VER );
 
-		// wp_localize_script() stringifies scalars, which would turn the delay
-		// into "700" and the boolean into "1"/"" — so hand over real JSON.
-		wp_add_inline_script(
-			'karo-kit-etch-structure-boot',
-			'window.KaroKitEtchStructureData = ' . wp_json_encode( array(
-				'dwellDelay'          => self::dwell(),
-				'placement'           => self::placement(),
-				'showDisabledOnDwell' => self::show_disabled(),
-			) ) . ';',
-			'before'
+		return array(
+			'data'    => array(
+				'name'  => 'KaroKitEtchStructureData',
+				'value' => array(
+					'dwellDelay'          => self::dwell(),
+					'placement'           => self::placement(),
+					'showDisabledOnDwell' => self::show_disabled(),
+				),
+			),
+			// Dependency order: logic -> render -> boot.
+			'scripts' => array(
+				KARO_KIT_URL . 'assets/etch/structure.js' . $v,
+				KARO_KIT_URL . 'assets/etch/structure-render.js' . $v,
+				KARO_KIT_URL . 'assets/etch/structure-boot.js' . $v,
+			),
 		);
 	}
 }
