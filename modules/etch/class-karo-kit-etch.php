@@ -6,11 +6,13 @@
  *  - Template Board: replaces Etch's native Templates screen with a board view
  *    (columns, reorder, search, thumbnails, graph), delegating create/delete/
  *    open back to Etch's own flow.
+ *  - Structure Arrows: hover-reveal up/down/outdent/indent controls in the
+ *    structure panel, so blocks can be reordered without dragging.
  *  - Reference: the dynamic-data bindings and shortcodes other modules expose
  *    to the Etch builder.
  *
- * Inert without Etch: the board's scripts self-gate on window.etch, and the
- * REST routes simply go unused.
+ * Inert without Etch: both features' scripts self-gate on window.etch, and
+ * the REST routes simply go unused.
  *
  * @package Karo_Kit\Etch
  */
@@ -31,6 +33,7 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 
 	public static function init(): void {
 		Karo_Kit_Etch_Board::init();
+		Karo_Kit_Etch_Structure::init();
 		Karo_Kit_Etch_Settings::init();
 	}
 
@@ -40,12 +43,18 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 
 	/** @inheritDoc */
 	public static function dashboard_groups(): array {
-		$on     = Karo_Kit_Etch_Board::enabled();
-		$status = array(
+		$on        = Karo_Kit_Etch_Board::enabled();
+		$arrows_on = Karo_Kit_Etch_Structure::enabled();
+		$status    = array(
 			array(
 				'label' => __( 'Template Board', 'karo-kit' ),
 				'value' => $on ? __( 'On', 'karo-kit' ) : __( 'Off', 'karo-kit' ),
 				'on'    => $on,
+			),
+			array(
+				'label' => __( 'Structure arrows', 'karo-kit' ),
+				'value' => $arrows_on ? __( 'On', 'karo-kit' ) : __( 'Off', 'karo-kit' ),
+				'on'    => $arrows_on,
 			),
 		);
 

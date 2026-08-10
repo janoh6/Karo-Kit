@@ -36,6 +36,10 @@ $karo_kit_options = array(
 	'karo_kit_etch_status',
 	'karo_kit_etch_board_on',
 	'karo_kit_etch_thumb_threshold',
+	'karo_kit_etch_structure_on',
+	'karo_kit_etch_structure_dwell',
+	'karo_kit_etch_structure_placement',
+	'karo_kit_etch_structure_show_disabled',
 	'karo_kit_etch_migrated',
 );
 

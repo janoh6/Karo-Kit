@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.7.0
+Stable tag: 0.8.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -40,10 +40,14 @@ Builder integration:
   status (WIP / Review / Ready / Live), thumbnails, and a graph of shared
   component usage. Create, open, delete and reset are delegated back to Etch's
   native controls rather than reimplemented.
+* Structure Arrows - hover a row in the structure panel to get up / down
+  arrows for reordering among siblings; keep hovering and outdent / indent
+  arrows appear for changing nesting depth. Only valid moves are drawn.
 * Reference - every dynamic-data binding and shortcode the kit exposes to Etch.
 
-Inert without Etch: the board's scripts self-gate on the Etch API, so nothing
-renders and nothing breaks on a site that doesn't run it.
+Each feature has its own on/off switch. Inert without Etch: the scripts
+self-gate on the Etch API, so nothing renders and nothing breaks on a site
+that doesn't run it.
 
 == Installation ==
 
@@ -52,6 +56,24 @@ renders and nothing breaks on a site that doesn't run it.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.8.0 =
+* Add: Structure Arrows in the Etch module — hover-reveal up / down / outdent /
+  indent controls on each row of Etch's structure panel, so blocks can be
+  reordered without dragging. Only valid moves are drawn; reordering shows on
+  hover, nesting after a short dwell.
+* Add: its own on/off switch (on by default), plus settings for the dwell
+  delay, which side of the row the arrows sit on, and whether unavailable
+  moves are drawn greyed out as a teaching layer. These were previously
+  edit-the-source constants in the standalone plugin.
+* Change: the arrows load on the front end for capable users only. The
+  standalone plugin also enqueued on every wp-admin screen for a hypothetical
+  future Etch build; that is dropped, since it shipped three scripts to every
+  admin page and polled ~10s before warning to the console.
+* Note: moves go through Etch's public block API and are persisted with a
+  debounced saveAsync. Etch exposes no "can this contain children?" query, so
+  indent uses a heuristic backstopped by catching WRONG_BLOCK_TYPE — a wrong
+  guess is a no-op, never a corrupted tree.
 
 = 0.7.0 =
 * Add: Module 2 — Etch. Bundles the Etch Template Board (kanban view of your
