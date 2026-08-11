@@ -17,7 +17,7 @@
 
 	var DATA = window.KaroKitEtchData || { restBase: '', nonce: '' };
 	var Bridge = window.KaroKitEtchBridge;
-	var state = { mounted: false, columns: [], order: [], enrichment: {}, apiSlugByTitle: {}, components: {}, filter: '', view: 'board', selectedNodeId: null, activeCategory: null, graphZoom: 1 };
+	var state = { mounted: false, columns: [], order: [], enrichment: {}, apiSlugByTitle: {}, components: {}, filter: '', view: 'board', selectedNodeId: null, activeCategory: null, graphZoom: 1, legendPos: null };
 	var warnedNoSlug = {};
 
 	/* ---------- Etch API readiness (used only for place watching) ---------- */
@@ -609,31 +609,152 @@
 		wrap.appendChild(panel);
 	}
 
+	/* ---------- Graph legend drag (free position, in-session only) ---------- */
+
+	var LEGEND_DRAG_THRESHOLD = 3; // px before a press counts as a drag
+
+	function setupLegendDrag(legend, handle) {
+		var startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false;
+
+		function onPointerMove(e) {
+			var dx = e.clientX - startX;
+			var dy = e.clientY - startY;
+			if (!dragging && (Math.abs(dx) > LEGEND_DRAG_THRESHOLD || Math.abs(dy) > LEGEND_DRAG_THRESHOLD)) {
+				dragging = true;
+				legend.classList.add('etb-graph__legend--dragging');
+			}
+			if (dragging) {
+				legend.style.left = Math.max(0, startLeft + dx) + 'px';
+				legend.style.top = Math.max(0, startTop + dy) + 'px';
+				legend.style.right = 'auto';
+			}
+		}
+		function onPointerUp() {
+			document.removeEventListener('pointermove', onPointerMove);
+			document.removeEventListener('pointerup', onPointerUp);
+			if (dragging) {
+				legend.classList.remove('etb-graph__legend--dragging');
+				state.legendPos = { left: legend.offsetLeft, top: legend.offsetTop };
+			}
+			dragging = false;
+		}
+		handle.addEventListener('pointerdown', function (e) {
+			if (e.button !== 0) { return; } // primary button / touch only
+			e.preventDefault();
+			startX = e.clientX; startY = e.clientY;
+			startLeft = legend.offsetLeft; startTop = legend.offsetTop;
+			document.addEventListener('pointermove', onPointerMove);
+			document.addEventListener('pointerup', onPointerUp);
+		});
+	}
+
 	function renderGraph() {
 		var cols = state.columns.map(function (col) {
 			return { key: col.key, label: col.label, items: col.items.filter(function (it) { return matchesFilter(it.title); }) };
 		}).filter(function (c) { return !state.filter || c.items.length; });
 
-		var colW = 240, nodeH = 44, gapY = 18, topPad = 70, hubY = 24, pad = 24;
-		var maxItems = cols.reduce(function (m, c) { return Math.max(m, c.items.length); }, 1);
+		var nodeH = 44, tplNodeW = 158, compNodeW = 170, pad = 50;
+		var TWO_PI = Math.PI * 2;
 
 		var compEntries = Object.keys(state.components || {}).map(function (id) {
 			var c = state.components[id] || {};
 			return { id: id, label: c.label || ('Component ' + id), usedIn: c.usedIn || [] };
 		});
-		var compNodeW = 170, compGapX = 20;
-		var compRowY = topPad + maxItems * (nodeH + gapY) + 50;
 
-		var width = Math.max(
-			pad * 2 + Math.max(cols.length, 1) * colW,
-			pad * 2 + compEntries.length * (compNodeW + compGapX)
-		);
-		var height = compEntries.length ? compRowY + nodeH + pad : topPad + maxItems * (nodeH + gapY) + pad;
+		// -----------------------------------------------------------
+		// Radial layout, computed in an arbitrary center-at-origin space
+		// first (offset into positive SVG coordinates once the extent of
+		// the whole graph is known). Hubs ring a center point; each hub's
+		// own templates fan out from it along the same outward direction
+		// as the hub, so a category reads as a spoke cluster rather than
+		// a fixed column. Shared components sit on an outer ring near the
+		// templates that use them; components nothing uses form a further
+		// halo of their own, spaced evenly since they have no anchor.
+		// -----------------------------------------------------------
+		var hubCount = Math.max(cols.length, 1);
+		var hubRadius = Math.max(190, hubCount * 34);
+		var maxItems = cols.reduce(function (m, c) { return Math.max(m, c.items.length); }, 1);
+		var maxTplRadius = 118 + Math.min(maxItems, 7) * 10;
+		var compRingRadius = hubRadius + maxTplRadius + 90;
+		var orphanRingRadius = compRingRadius + 90;
+
+		function angularDelta(a, b) {
+			var d = Math.abs(a - b) % TWO_PI;
+			return d > Math.PI ? TWO_PI - d : d;
+		}
+
+		var hubs = [], templates = [], tplRawPos = {};
+
+		cols.forEach(function (c, ci) {
+			var angle = TWO_PI * (ci / hubCount) - Math.PI / 2;
+			var hx = Math.cos(angle) * hubRadius, hy = Math.sin(angle) * hubRadius;
+			var hubId = 'cat:' + c.key;
+			hubs.push({ id: hubId, label: c.label, items: c.items, x: hx, y: hy });
+
+			var n = c.items.length;
+			var spread = (Math.min(280, Math.max(46, n * 32)) * Math.PI) / 180;
+			var tplRadius = 118 + Math.min(n, 7) * 10;
+
+			c.items.forEach(function (it, ii) {
+				var a = n > 1 ? (angle - spread / 2 + (spread * ii) / (n - 1)) : angle;
+				var tx = hx + Math.cos(a) * tplRadius, ty = hy + Math.sin(a) * tplRadius;
+				var tplId = 'tpl:' + (it.slug || it.title);
+				templates.push({ id: tplId, hubX: hx, hubY: hy, x: tx, y: ty, item: it });
+				tplRawPos[tplId] = { x: tx, y: ty };
+			});
+		});
+
+		// Components with usedIn are placed near the angular midpoint of the
+		// templates that use them; ones already claiming that angle at that
+		// radius push the next claimant out a ring further, rather than overlap.
+		var placedAngles = [];
+		var MIN_ANGLE_GAP = (26 * Math.PI) / 180;
+
+		var components = compEntries.map(function (comp) {
+			return { comp: comp, orphan: comp.usedIn.length === 0, x: 0, y: 0 };
+		});
+
+		components.filter(function (c) { return !c.orphan; }).forEach(function (c) {
+			var sx = 0, sy = 0, n = 0;
+			c.comp.usedIn.forEach(function (slug) {
+				var p = tplRawPos['tpl:' + slug];
+				if (p) { sx += p.x; sy += p.y; n++; }
+			});
+			var angle = n ? Math.atan2(sy / n, sx / n) : 0;
+			var radius = compRingRadius, guard = 0;
+			while (guard < 6 && placedAngles.some(function (p) { return p.radius === radius && angularDelta(angle, p.angle) < MIN_ANGLE_GAP; })) {
+				radius += 70; guard++;
+			}
+			placedAngles.push({ angle: angle, radius: radius });
+			c.x = Math.cos(angle) * radius;
+			c.y = Math.sin(angle) * radius;
+		});
+
+		var orphanList = components.filter(function (c) { return c.orphan; });
+		orphanList.forEach(function (c, i) {
+			var angle = TWO_PI * (i / Math.max(orphanList.length, 1)) - Math.PI / 2;
+			c.x = Math.cos(angle) * orphanRingRadius;
+			c.y = Math.sin(angle) * orphanRingRadius;
+		});
+
+		// ---- Bounds -> offset so nothing sits at a negative coordinate ----
+		var xs = [0], ys = [0];
+		hubs.forEach(function (h) {
+			var hw = Math.max(70, h.label.length * 6.5 + 40);
+			xs.push(h.x - hw / 2, h.x + hw / 2); ys.push(h.y - 16, h.y + 16);
+		});
+		templates.forEach(function (t) { xs.push(t.x - tplNodeW / 2, t.x + tplNodeW / 2); ys.push(t.y - nodeH / 2, t.y + nodeH / 2); });
+		components.forEach(function (c) { xs.push(c.x - compNodeW / 2, c.x + compNodeW / 2); ys.push(c.y - nodeH / 2, c.y + nodeH / 2); });
+
+		var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+		var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+		var offsetX = pad - minX, offsetY = pad - minY;
+		var width = maxX - minX + pad * 2, height = maxY - minY + pad * 2;
 
 		var wrap = el('div', 'etb-graph');
 		var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, width: width, height: height, class: 'etb-graph__svg' });
 
-		var pos = {};   // node id -> {x, y} (center)
+		var pos = {};   // node id -> {x, y} (final, offset-applied center)
 		var meta = {};  // node id -> panel/tooltip data
 		var refs = {};  // node id -> template item (templates only)
 
@@ -650,72 +771,74 @@
 		}
 
 		// Category hubs + their templates.
-		cols.forEach(function (c, ci) {
-			var cx = pad + ci * colW + colW / 2;
-			var hubId = 'cat:' + c.key;
-			meta[hubId] = {
-				title: c.label,
-				subtitle: c.items.length + ' template' + (c.items.length === 1 ? '' : 's'),
-				listLabel: 'Templates', items: c.items.map(function (it) { return it.title; }),
+		hubs.forEach(function (h) {
+			var hx = h.x + offsetX, hy = h.y + offsetY;
+			meta[h.id] = {
+				title: h.label,
+				subtitle: h.items.length + ' template' + (h.items.length === 1 ? '' : 's'),
+				listLabel: 'Templates', items: h.items.map(function (it) { return it.title; }),
 			};
 
 			var hubG = svgEl('g', { class: 'etb-graph__hub-node', tabindex: '0', role: 'button' });
-			var hubText = svgEl('text', { x: cx, y: hubY, 'text-anchor': 'middle', class: 'etb-graph__hub' });
-			hubText.textContent = c.label + ' (' + c.items.length + ')';
+			var hubText = svgEl('text', { x: hx, y: hy, 'text-anchor': 'middle', class: 'etb-graph__hub' });
+			hubText.textContent = h.label + ' (' + h.items.length + ')';
 			hubG.appendChild(hubText);
-			attachNodeEvents(hubG, hubId, cx, hubY - 10);
+			attachNodeEvents(hubG, h.id, hx, hy - 10);
 			svg.appendChild(hubG);
-
-			c.items.forEach(function (it, ii) {
-				var y = topPad + ii * (nodeH + gapY);
-				var tplId = 'tpl:' + (it.slug || it.title);
-				pos[tplId] = { x: cx, y: y + nodeH / 2 };
-				refs[tplId] = it;
-
-				var compLabels = (it.components || []).map(function (cc) { return cc.label; });
-				var subBits = [it.type];
-				if (it.status && it.status !== 'live') { subBits.push(STATUS_LABELS[it.status] || it.status); }
-				if (it.lastModified) { subBits.push(it.lastModified); }
-				meta[tplId] = {
-					title: it.title, subtitle: subBits.join(' \u00B7 '),
-					listLabel: 'Composition', items: compLabels,
-				};
-
-				svg.appendChild(svgEl('line', { x1: cx, y1: hubY + 10, x2: cx, y2: y + nodeH / 2, class: 'etb-graph__edge' }));
-
-				var statusCls = it.status && it.status !== 'live' ? ' etb-graph__node--' + it.status : '';
-				var typeCls = ' etb-graph__node--' + String(it.type || 'single').toLowerCase();
-				var g = svgEl('g', { class: 'etb-graph__node' + typeCls + statusCls, tabindex: '0', role: 'button' });
-				g.appendChild(svgEl('rect', { x: cx - colW / 2 + pad, y: y, width: colW - pad * 2, height: nodeH, rx: 8 }));
-				var t = svgEl('text', { x: cx, y: y + nodeH / 2 + 5, 'text-anchor': 'middle', class: 'etb-graph__label' });
-				t.textContent = it.title;
-				g.appendChild(t);
-				attachNodeEvents(g, tplId, cx, y);
-				svg.appendChild(g);
-			});
 		});
 
-		// Shared-component layer: one row, dashed edges to every template that uses it.
-		compEntries.forEach(function (comp, ci) {
-			var cx = pad + ci * (compNodeW + compGapX) + compNodeW / 2;
-			var cy = compRowY;
-			var compId = 'comp:' + comp.id;
-			meta[compId] = {
-				title: '\u29C9 ' + comp.label,
-				subtitle: 'shared component \u00B7 used in ' + comp.usedIn.length + ' template' + (comp.usedIn.length === 1 ? '' : 's'),
-				listLabel: 'Used in', items: comp.usedIn,
+		templates.forEach(function (t) {
+			var tx = t.x + offsetX, ty = t.y + offsetY;
+			var hx = t.hubX + offsetX, hy = t.hubY + offsetY;
+			pos[t.id] = { x: tx, y: ty };
+			refs[t.id] = t.item;
+
+			var compLabels = (t.item.components || []).map(function (cc) { return cc.label; });
+			var subBits = [t.item.type];
+			if (t.item.status && t.item.status !== 'live') { subBits.push(STATUS_LABELS[t.item.status] || t.item.status); }
+			if (t.item.lastModified) { subBits.push(t.item.lastModified); }
+			meta[t.id] = {
+				title: t.item.title, subtitle: subBits.join(' \u00B7 '),
+				listLabel: 'Composition', items: compLabels,
 			};
 
-			comp.usedIn.forEach(function (slug) {
-				var p = pos['tpl:' + slug];
-				if (p) { svg.appendChild(svgEl('line', { x1: p.x, y1: p.y, x2: cx, y2: cy + nodeH / 2, class: 'etb-graph__edge etb-graph__edge--component' })); }
-			});
+			svg.appendChild(svgEl('line', { x1: hx, y1: hy, x2: tx, y2: ty, class: 'etb-graph__edge' }));
 
-			var g = svgEl('g', { class: 'etb-graph__node etb-graph__node--component', tabindex: '0', role: 'button' });
-			g.appendChild(svgEl('rect', { x: cx - compNodeW / 2, y: cy, width: compNodeW, height: nodeH, rx: 8 }));
-			var t = svgEl('text', { x: cx, y: cy + nodeH / 2 + 5, 'text-anchor': 'middle', class: 'etb-graph__label' });
-			t.textContent = comp.label;
-			g.appendChild(t);
+			var statusCls = t.item.status && t.item.status !== 'live' ? ' etb-graph__node--' + t.item.status : '';
+			var typeCls = ' etb-graph__node--' + String(t.item.type || 'single').toLowerCase();
+			var g = svgEl('g', { class: 'etb-graph__node' + typeCls + statusCls, tabindex: '0', role: 'button' });
+			g.appendChild(svgEl('rect', { x: tx - tplNodeW / 2, y: ty - nodeH / 2, width: tplNodeW, height: nodeH, rx: 8 }));
+			var t2 = svgEl('text', { x: tx, y: ty + 5, 'text-anchor': 'middle', class: 'etb-graph__label' });
+			t2.textContent = t.item.title;
+			g.appendChild(t2);
+			attachNodeEvents(g, t.id, tx, ty - nodeH / 2);
+			svg.appendChild(g);
+		});
+
+		// Shared components: solid edges to every template that uses them; unused ones sit on the outer halo, unconnected.
+		components.forEach(function (c) {
+			var cx = c.x + offsetX, cy = c.y + offsetY;
+			var compId = 'comp:' + c.comp.id;
+			meta[compId] = {
+				title: '\u29C9 ' + c.comp.label,
+				subtitle: c.orphan
+					? 'shared component \u00B7 not used in any template'
+					: 'shared component \u00B7 used in ' + c.comp.usedIn.length + ' template' + (c.comp.usedIn.length === 1 ? '' : 's'),
+				listLabel: 'Used in', items: c.comp.usedIn,
+			};
+
+			if (!c.orphan) {
+				c.comp.usedIn.forEach(function (slug) {
+					var p = pos['tpl:' + slug];
+					if (p) { svg.appendChild(svgEl('line', { x1: p.x, y1: p.y, x2: cx, y2: cy, class: 'etb-graph__edge etb-graph__edge--component' })); }
+				});
+			}
+
+			var g = svgEl('g', { class: 'etb-graph__node etb-graph__node--component' + (c.orphan ? ' etb-graph__node--orphan' : ''), tabindex: '0', role: 'button' });
+			g.appendChild(svgEl('rect', { x: cx - compNodeW / 2, y: cy - nodeH / 2, width: compNodeW, height: nodeH, rx: 8 }));
+			var t3 = svgEl('text', { x: cx, y: cy + 5, 'text-anchor': 'middle', class: 'etb-graph__label' });
+			t3.textContent = c.comp.label;
+			g.appendChild(t3);
 			attachNodeEvents(g, compId, cx, cy);
 			svg.appendChild(g);
 		});
@@ -725,10 +848,13 @@
 
 		// Legend
 		var legend = el('div', 'etb-graph__legend');
-		legend.appendChild(el('div', 'etb-graph__legend-title', 'Legend'));
+		var legendHandle = el('div', 'etb-graph__legend-title');
+		legendHandle.appendChild(gripIcon());
+		legendHandle.appendChild(el('span', null, 'Legend'));
+		legend.appendChild(legendHandle);
 		[
 			['category', 'Category'], ['single', 'Single template'], ['archive', 'Archive template'],
-			['system', 'System template'], ['component', 'Shared component'],
+			['system', 'System template'], ['component', 'Shared component'], ['orphan', 'Unused component'],
 		].forEach(function (row) {
 			var r = el('div', 'etb-graph__legend-row');
 			var dot = el('span', 'etb-graph__legend-dot');
@@ -741,6 +867,12 @@
 		reuse.appendChild(el('span', 'etb-graph__legend-dash'));
 		reuse.appendChild(el('span', null, 'reused by'));
 		legend.appendChild(reuse);
+		if (state.legendPos) {
+			legend.style.left = state.legendPos.left + 'px';
+			legend.style.top = state.legendPos.top + 'px';
+			legend.style.right = 'auto';
+		}
+		setupLegendDrag(legend, legendHandle);
 		wrap.appendChild(legend);
 
 		// Zoom controls

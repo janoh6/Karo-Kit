@@ -33,6 +33,7 @@
 	--etb-c-archive: oklch(75% 0.14 70);
 	--etb-c-system: oklch(60% 0.01 280);
 	--etb-c-component: oklch(80% 0.16 130);
+	--etb-c-orphan: var(--etb-danger);
 
 	font-family: var(--etb-font);
 	color: var(--etb-text);
@@ -485,13 +486,21 @@
 	backdrop-filter: blur(4px);
 }
 .etb-graph__legend-title {
+	display: flex;
+	align-items: center;
+	gap: 0.375rem;
 	font-size: 0.6875rem;
 	font-weight: 700;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--etb-text-muted);
 	margin-bottom: 0.125rem;
+	cursor: grab;
+	touch-action: none;
 }
+.etb-graph__legend-title .etb-column__grip-icon { flex-shrink: 0; }
+.etb-graph__legend--dragging { cursor: grabbing; user-select: none; }
+.etb-graph__legend--dragging .etb-graph__legend-title { cursor: grabbing; }
 .etb-graph__legend-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: oklch(80% 0.005 280); }
 .etb-graph__legend-dot { width: 0.625rem; height: 0.625rem; border-radius: 0.1875rem; flex-shrink: 0; }
 .etb-graph__legend-dash { width: 1rem; height: 0; border-top: 1.5px dashed var(--etb-c-component); flex-shrink: 0; }
@@ -562,6 +571,11 @@
 	stroke: color-mix(in oklch, var(--etb-c-component) 55%, var(--etb-border-strong));
 	stroke-dasharray: 3 2;
 }
+.etb-graph__node--orphan rect {
+	fill: color-mix(in oklch, var(--etb-c-orphan) 10%, var(--etb-surface));
+	stroke: color-mix(in oklch, var(--etb-c-orphan) 65%, var(--etb-border-strong));
+}
+.etb-graph__node--orphan .etb-graph__label { fill: color-mix(in oklch, var(--etb-c-orphan) 80%, var(--etb-text)); }
 .etb-graph__hub-node .etb-graph__hub { fill: var(--etb-c-category); }
 .etb-graph__node--wip rect { stroke: oklch(78% 0.15 75); }
 .etb-graph__node--review rect { stroke: oklch(75% 0.13 240); }
