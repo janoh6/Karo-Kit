@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.12.0
+Stable tag: 0.12.2
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,22 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.12.2 =
+* Fix: the accent picker showed each family's Automatic.css factory default
+  instead of the colour actually in use. ACSS keeps two copies of a colour —
+  a hex field and a set of OKLCH components — and only the OKLCH components
+  update when you edit a colour in its picker; the hex field is never
+  touched again. The generated CSS is built from OKLCH, so that's what the
+  picker now reads too, converting it to hex itself.
+
+= 0.12.1 =
+* Fix: the accent picker always said no Automatic.css brand colours were set,
+  even on a site with a full palette. It looked for the family name on its own
+  (`primary`); ACSS stores the hex one key over, under `color-primary`.
+* Families switched off in ACSS are now left out of the picker. An off family
+  still has a stored hex, but it generates nothing on the site — borrowing it
+  would mean matching a colour the build doesn't actually use.
 
 = 0.12.0 =
 * Add: the dashboard can borrow its accent colour from this site's

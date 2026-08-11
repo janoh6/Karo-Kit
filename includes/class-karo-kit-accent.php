@@ -67,8 +67,16 @@ final class Karo_Kit_Accent {
 	/**
 	 * Families ACSS actually has a usable colour for, as key => [label, hex].
 	 *
-	 * A family can be present but switched off, or hold something that isn't a
-	 * colour; both are filtered out so the picker only offers real choices.
+	 * ACSS stores each family two ways: a "color-<family>" hex, and
+	 * "<family>-l/c/h-oklch" components. The CSS it actually ships is built
+	 * from the OKLCH components — editing a colour in ACSS's picker updates
+	 * those, not the hex field, so the hex is only ever the factory default.
+	 * The OKLCH triplet is read first for that reason, with the hex used
+	 * only when it's missing (an older ACSS version, say).
+	 *
+	 * Families switched off in ACSS generate no variables on the site, so
+	 * borrowing one would mean matching a colour the build doesn't use; those
+	 * are skipped too.
 	 *
 	 * @return array<string,array{label:string,hex:string}>
 	 */
@@ -80,13 +88,65 @@ final class Karo_Kit_Accent {
 
 		$out = array();
 		foreach ( self::FAMILIES as $key => $label ) {
-			$hex = self::normalise_hex( $settings[ $key ] ?? '' );
+			if ( 'on' !== ( $settings[ 'option-' . $key . '-clr' ] ?? '' ) ) {
+				continue;
+			}
+			$hex = self::oklch_hex( $settings, $key );
+			if ( '' === $hex ) {
+				$hex = self::normalise_hex( $settings[ 'color-' . $key ] ?? '' );
+			}
 			if ( '' === $hex ) {
 				continue;
 			}
 			$out[ $key ] = array( 'label' => $label, 'hex' => $hex );
 		}
 		return $out;
+	}
+
+	/**
+	 * The family's colour as stored in ACSS's OKLCH components, converted to
+	 * hex. '' if any component is missing or not numeric.
+	 */
+	private static function oklch_hex( array $settings, string $key ): string {
+		$l = $settings[ $key . '-l-oklch' ] ?? null;
+		$c = $settings[ $key . '-c-oklch' ] ?? null;
+		$h = $settings[ $key . '-h-oklch' ] ?? null;
+		if ( ! is_numeric( $l ) || ! is_numeric( $c ) || ! is_numeric( $h ) ) {
+			return '';
+		}
+		return self::from_oklch( (float) $l, (float) $c, (float) $h );
+	}
+
+	/**
+	 * OKLCH → sRGB hex, the inverse of the matrices ACSS uses to go the other
+	 * way (its PHPColors library only converts hex to OKLCH, not back).
+	 * Standard OKLab transform (Björn Ottosson) — out-of-gamut channels are
+	 * clamped rather than gamut-mapped, which is fine for a UI accent.
+	 */
+	public static function from_oklch( float $l, float $c, float $h ): string {
+		$hr = deg2rad( $h );
+		$a  = $c * cos( $hr );
+		$b  = $c * sin( $hr );
+
+		$l_ = $l + 0.3963377774 * $a + 0.2158037573 * $b;
+		$m_ = $l - 0.1055613458 * $a - 0.0638541728 * $b;
+		$s_ = $l - 0.0894841775 * $a - 1.2914855480 * $b;
+
+		$ll = $l_ ** 3;
+		$mm = $m_ ** 3;
+		$ss = $s_ ** 3;
+
+		$r = 4.0767416621 * $ll - 3.3077115913 * $mm + 0.2309699292 * $ss;
+		$g = -1.2684380046 * $ll + 2.6097574011 * $mm - 0.3413193965 * $ss;
+		$bl = -0.0041960863 * $ll - 0.7034186147 * $mm + 1.7076147010 * $ss;
+
+		$to_srgb = static function ( float $v ): int {
+			$v = max( 0.0, min( 1.0, $v ) );
+			$v = $v <= 0.0031308 ? $v * 12.92 : 1.055 * ( $v ** ( 1 / 2.4 ) ) - 0.055;
+			return (int) round( max( 0.0, min( 1.0, $v ) ) * 255 );
+		};
+
+		return sprintf( '#%02x%02x%02x', $to_srgb( $r ), $to_srgb( $g ), $to_srgb( $bl ) );
 	}
 
 	/** The chosen source key, or '' for the kit's own colour. */
@@ -219,7 +279,7 @@ final class Karo_Kit_Accent {
 		}
 
 		if ( ! $available ) {
-			echo '<p class="kk-empty">' . esc_html__( 'Automatic.css is active but none of its brand colours are set. Define one there and it will appear here.', 'karo-kit' ) . '</p>';
+			echo '<p class="kk-empty">' . esc_html__( 'Automatic.css is active but none of its brand colour families are switched on. Enable one under Colors (Palette) there and it will appear here.', 'karo-kit' ) . '</p>';
 			echo '</section></div>';
 			return;
 		}
