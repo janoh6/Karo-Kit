@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.12.2
+Stable tag: 0.13.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,16 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.13.0 =
+* Add: a "Custom colour" option on the accent picker — a plain hex field,
+  always available regardless of whether Automatic.css is active. Sites
+  without ACSS previously had no way to pick their own accent at all.
+* Fix: Sidebar Tabs' collapse pull-tab stayed on screen even while a
+  different tab than Structure was showing in that side panel, since it only
+  tracked whether the panel container existed, not which of Etch's internal
+  panes was active. It now watches Etch's own pane state and hides itself
+  while Structure isn't the one in view.
 
 = 0.12.2 =
 * Fix: the accent picker showed each family's Automatic.css factory default

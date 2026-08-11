@@ -22,6 +22,9 @@ final class Karo_Kit_Accent {
 
 	const SOURCE_OPT = 'karo_kit_accent_source';
 
+	/** A hand-picked hex, used when SOURCE_OPT is 'custom'. */
+	const CUSTOM_OPT = 'karo_kit_accent_custom';
+
 	/** Where ACSS keeps its settings. Read directly — no dependency on its classes. */
 	const ACSS_OPTION = 'automatic_css_settings';
 
@@ -51,11 +54,19 @@ final class Karo_Kit_Accent {
 			'sanitize_callback' => array( __CLASS__, 'sanitize_source' ),
 			'default'           => '',
 		) );
+		register_setting( Karo_Kit::OPTION_GROUP, self::CUSTOM_OPT, array(
+			'type'              => 'string',
+			'sanitize_callback' => array( __CLASS__, 'normalise_hex' ),
+			'default'           => '',
+		) );
 	}
 
 	public static function sanitize_source( $value ): string {
 		$value = sanitize_key( (string) $value );
-		return isset( self::FAMILIES[ $value ] ) ? $value : '';
+		if ( 'custom' === $value || isset( self::FAMILIES[ $value ] ) ) {
+			return $value;
+		}
+		return '';
 	}
 
 	/* ---- Reading ACSS ----------------------------------------------------- */
@@ -149,15 +160,27 @@ final class Karo_Kit_Accent {
 		return sprintf( '#%02x%02x%02x', $to_srgb( $r ), $to_srgb( $g ), $to_srgb( $bl ) );
 	}
 
-	/** The chosen source key, or '' for the kit's own colour. */
+	/** The chosen source key, 'custom', or '' for the kit's own colour. */
 	public static function source(): string {
 		$source = (string) get_option( self::SOURCE_OPT, '' );
-		return isset( self::FAMILIES[ $source ] ) ? $source : '';
+		if ( 'custom' === $source || isset( self::FAMILIES[ $source ] ) ) {
+			return $source;
+		}
+		return '';
+	}
+
+	/** The hand-picked hex from the custom-colour field, or '' if unset/invalid. */
+	public static function custom_hex(): string {
+		return self::normalise_hex( get_option( self::CUSTOM_OPT, '' ) );
 	}
 
 	/** The accent actually in force. Falls back whenever the source can't be resolved. */
 	public static function accent(): string {
 		$source = self::source();
+		if ( 'custom' === $source ) {
+			$hex = self::custom_hex();
+			return '' !== $hex ? $hex : self::DEFAULT_ACCENT;
+		}
 		if ( '' === $source ) {
 			return self::DEFAULT_ACCENT;
 		}
@@ -268,29 +291,24 @@ final class Karo_Kit_Accent {
 		$available = self::available();
 		$source    = self::source();
 		$accent    = self::accent();
+		$custom    = self::custom_hex();
 
 		echo '<div class="kk-content"><section class="kk-card">';
 		echo '<div class="kk-card__header"><span class="kk-card__title">' . esc_html__( 'Accent colour', 'karo-kit' ) . '</span></div>';
 
-		if ( ! self::acss_active() ) {
-			echo '<p class="kk-empty">' . esc_html__( 'Automatic.css isn\'t active on this site, so there is no palette to borrow. The dashboard uses its own colour.', 'karo-kit' ) . '</p>';
-			echo '</section></div>';
-			return;
+		if ( $available ) {
+			echo '<p class="kk-empty">' . esc_html__( 'Borrow a colour from this site\'s Automatic.css palette, or set one of your own below. Only the accent changes — surfaces stay neutral, since they carry the light and dark themes.', 'karo-kit' ) . '</p>';
+		} elseif ( self::acss_active() ) {
+			echo '<p class="kk-empty">' . esc_html__( 'Automatic.css is active but none of its brand colour families are switched on, so there\'s nothing to borrow yet. Enable one under Colors (Palette) there, or set a colour of your own below.', 'karo-kit' ) . '</p>';
+		} else {
+			echo '<p class="kk-empty">' . esc_html__( 'Automatic.css isn\'t active on this site, so there is no palette to borrow. Set a colour of your own below, or leave this on the kit\'s default.', 'karo-kit' ) . '</p>';
 		}
-
-		if ( ! $available ) {
-			echo '<p class="kk-empty">' . esc_html__( 'Automatic.css is active but none of its brand colour families are switched on. Enable one under Colors (Palette) there and it will appear here.', 'karo-kit' ) . '</p>';
-			echo '</section></div>';
-			return;
-		}
-
-		echo '<p class="kk-empty">' . esc_html__( 'Borrow a colour from this site\'s Automatic.css palette so the dashboard matches the build. Only the accent changes — surfaces stay neutral, since they carry the light and dark themes.', 'karo-kit' ) . '</p>';
 
 		echo '<form action="options.php" method="post">';
 		settings_fields( Karo_Kit::OPTION_GROUP );
-		echo '<table class="form-table" role="presentation"><tr>';
-		echo '<th>' . esc_html__( 'Source', 'karo-kit' ) . '</th><td>';
+		echo '<table class="form-table" role="presentation">';
 
+		echo '<tr><th>' . esc_html__( 'Source', 'karo-kit' ) . '</th><td>';
 		printf( '<select name="%s">', esc_attr( self::SOURCE_OPT ) );
 		printf(
 			'<option value="" %s>%s</option>',
@@ -306,6 +324,11 @@ final class Karo_Kit_Accent {
 				esc_html( $family['hex'] )
 			);
 		}
+		printf(
+			'<option value="custom" %s>%s</option>',
+			selected( $source, 'custom', false ),
+			esc_html__( 'Custom colour', 'karo-kit' )
+		);
 		echo '</select>';
 
 		printf(
@@ -326,8 +349,18 @@ final class Karo_Kit_Accent {
 				)
 			) . '</p>';
 		}
+		echo '</td></tr>';
 
-		echo '</td></tr></table>';
+		echo '<tr><th><label for="kk-accent-custom">' . esc_html__( 'Custom colour', 'karo-kit' ) . '</label></th><td>';
+		printf(
+			'<input type="text" id="kk-accent-custom" class="regular-text" name="%s" value="%s" placeholder="#ffb020" maxlength="7" />',
+			esc_attr( self::CUSTOM_OPT ),
+			esc_attr( $custom )
+		);
+		echo '<p class="description">' . esc_html__( 'A hex value. Only used while Source above is set to "Custom colour".', 'karo-kit' ) . '</p>';
+		echo '</td></tr>';
+
+		echo '</table>';
 		echo '<p class="submit" style="margin-top:8px">';
 		submit_button( null, 'primary', 'submit', false );
 		echo '</p></form>';

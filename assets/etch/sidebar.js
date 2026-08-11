@@ -165,6 +165,33 @@
 		btn.innerHTML = CHEVRON;
 		document.body.appendChild( btn );
 
+		// FEATURE: some sidebars are tabbed pane groups — Etch's Structure panel
+		// shares its .etch-sidebar with other panes (Style, Settings, ...), only
+		// one of which is visible at a time. A collapse tab for that container
+		// only makes sense while Structure is the pane actually showing, so it
+		// hides itself the rest of the time. Etch marks the active pane with
+		// data-pane-state="expanded" on the wrapper around the pane's header;
+		// the Structure pane's header carries etch-header-title-wrapper--structure-panel.
+		// Sidebars without a Structure pane at all (e.g. the other side) have no
+		// marker to find, so this is a no-op for them — normal behaviour applies.
+		var structureMarker = sidebar.querySelector( '.etch-header-title-wrapper--structure-panel' );
+		var structurePane = structureMarker ? structureMarker.closest( '[data-pane-state]' ) : null;
+
+		function syncStructureVisibility() {
+			if ( ! structurePane ) {
+				return;
+			}
+			btn.style.display = 'expanded' === structurePane.getAttribute( 'data-pane-state' ) ? '' : 'none';
+		}
+
+		if ( structurePane ) {
+			syncStructureVisibility();
+			new MutationObserver( syncStructureVisibility ).observe( structurePane, {
+				attributes: true,
+				attributeFilter: [ 'data-pane-state' ]
+			} );
+		}
+
 		function isCollapsed() {
 			return sidebar.classList.contains( 'kk-sidebar--collapsed' );
 		}
