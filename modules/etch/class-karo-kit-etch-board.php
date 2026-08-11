@@ -469,22 +469,38 @@ final class Karo_Kit_Etch_Board {
 	/** @return array<string,string> component id => label, deduped. */
 	private static function extract_components( $content ): array {
 		$found = array();
-		$names = apply_filters( 'karo_kit_etch_component_block_names', array() ); // e.g. array( 'etch/component' )
+
+		/**
+		 * Block names that reference a reusable component post.
+		 *
+		 * Etch's own components are `etch/component` blocks carrying a `ref` to
+		 * a wp_block post — the same indirection `core/block` uses for WordPress
+		 * synced patterns, under a different block name. Detecting only
+		 * `core/block` (as this did) found nothing at all on an Etch site, which
+		 * left the graph's whole shared-component layer permanently empty.
+		 */
+		$names = apply_filters( 'karo_kit_etch_component_block_names', array( 'core/block', 'etch/component' ) );
 
 		$walk = static function ( $blocks ) use ( &$walk, &$found, $names ) {
 			foreach ( $blocks as $b ) {
 				$name = $b['blockName'] ?? '';
 
-				if ( 'core/block' === $name && ! empty( $b['attrs']['ref'] ) ) {
-					$ref_id = (int) $b['attrs']['ref'];
-					$ref    = get_post( $ref_id );
-					if ( $ref ) {
-						$found[ $ref_id ] = $ref->post_title ? $ref->post_title : ( 'Component #' . $ref_id );
+				if ( $name && in_array( $name, $names, true ) ) {
+					if ( ! empty( $b['attrs']['ref'] ) ) {
+						$ref_id = (int) $b['attrs']['ref'];
+						$ref    = get_post( $ref_id );
+						if ( $ref ) {
+							$found[ $ref_id ] = $ref->post_title ? $ref->post_title : ( 'Component #' . $ref_id );
+						}
+					} elseif ( ! empty( $b['attrs']['id'] ) ) {
+						// A registered block that identifies itself inline rather
+						// than pointing at a post. An id is required: Etch also
+						// emits ref-less component blocks (unsynced placeholders),
+						// and keying those on the bare block name would collapse
+						// every one of them into a single bogus "etch/component".
+						$id           = (string) $b['attrs']['id'];
+						$found[ $id ] = ! empty( $b['attrs']['name'] ) ? $b['attrs']['name'] : $name;
 					}
-				} elseif ( $name && in_array( $name, $names, true ) ) {
-					$label        = ! empty( $b['attrs']['name'] ) ? $b['attrs']['name'] : $name;
-					$id           = ! empty( $b['attrs']['id'] ) ? (string) $b['attrs']['id'] : $name;
-					$found[ $id ] = $label;
 				}
 
 				if ( ! empty( $b['innerBlocks'] ) ) {
@@ -497,20 +513,52 @@ final class Karo_Kit_Etch_Board {
 	}
 
 	/**
-	 * Aggregate component usage across every template: id => { label, usedIn }.
+	 * Aggregate component usage: id => { label, usedIn, usedInComponents }.
 	 * Powers the shared-component layer in Graph view.
+	 *
+	 * Only components something actually references are reported. Etch sites
+	 * carry far more components than templates (59 against 7 on the build this
+	 * was measured on, most of them unused), so listing every component post
+	 * would send mostly-empty rows the graph immediately discards.
+	 *
+	 * Usage is counted from two directions: a component nested inside another
+	 * component is still in use, and the graph shows that in a node's panel as
+	 * blast radius that template links alone would miss.
 	 */
 	public static function get_components() {
-		$agg = array();
+		$agg   = array();
+		$posts = get_posts( array(
+			'post_type'        => 'wp_block',
+			'post_status'      => array( 'publish', 'draft', 'private' ),
+			'posts_per_page'   => -1,
+			'suppress_filters' => false,
+		) );
+
+		$record = static function ( $key, $label, $bucket, $where ) use ( &$agg ) {
+			if ( ! isset( $agg[ $key ] ) ) {
+				$agg[ $key ] = array( 'label' => $label, 'usedIn' => array(), 'usedInComponents' => array() );
+			}
+			// A component referenced twice in the same place is one usage, not two.
+			if ( ! in_array( $where, $agg[ $key ][ $bucket ], true ) ) {
+				$agg[ $key ][ $bucket ][] = $where;
+			}
+		};
+
 		foreach ( get_block_templates( array(), 'wp_template' ) as $t ) {
 			foreach ( self::extract_components( $t->content ?? '' ) as $id => $label ) {
-				$key = (string) $id;
-				if ( ! isset( $agg[ $key ] ) ) {
-					$agg[ $key ] = array( 'label' => $label, 'usedIn' => array() );
-				}
-				$agg[ $key ]['usedIn'][] = $t->slug;
+				$record( (string) $id, $label, 'usedIn', $t->slug );
 			}
 		}
+
+		foreach ( $posts as $p ) {
+			foreach ( self::extract_components( $p->post_content ?? '' ) as $id => $label ) {
+				if ( (string) $id === (string) $p->ID ) {
+					continue; // a component can't count as nesting itself
+				}
+				$record( (string) $id, $label, 'usedInComponents', $p->post_title ? $p->post_title : ( 'Component #' . $p->ID ) );
+			}
+		}
+
 		return rest_ensure_response( $agg );
 	}
 

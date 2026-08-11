@@ -17,7 +17,7 @@
 
 	var DATA = window.KaroKitEtchData || { restBase: '', nonce: '' };
 	var Bridge = window.KaroKitEtchBridge;
-	var state = { mounted: false, columns: [], order: [], enrichment: {}, apiSlugByTitle: {}, components: {}, filter: '', view: 'board', selectedNodeId: null, activeCategory: null, graphZoom: 1, legendPos: null };
+	var state = { mounted: false, columns: [], order: [], enrichment: {}, apiSlugByTitle: {}, components: {}, filter: '', view: 'board', selectedNodeId: null, activeCategory: null, graphZoom: 1, legendPos: null, graphNeedsCenter: true, layers: null };
 	var warnedNoSlug = {};
 
 	/* ---------- Etch API readiness (used only for place watching) ---------- */
@@ -589,6 +589,18 @@
 		});
 		panel.appendChild(list);
 
+		// Optional second list \u2014 a component nested inside other components has
+		// two different kinds of usage, and collapsing them into one list would
+		// misreport which templates actually carry it.
+		if (m.items2 && m.items2.length) {
+			panel.appendChild(el('div', 'etb-graph__panel-label', m.listLabel2 || 'Also in'));
+			var list2 = el('div', 'etb-graph__panel-list');
+			m.items2.forEach(function (li) {
+				list2.appendChild(el('div', 'etb-graph__panel-item', li));
+			});
+			panel.appendChild(list2);
+		}
+
 		if (item) {
 			var actions = el('div', 'etb-graph__panel-actions');
 			var openBtn = el('button', 'etb-menu__item', 'Open');
@@ -609,9 +621,41 @@
 		wrap.appendChild(panel);
 	}
 
-	/* ---------- Graph legend drag (free position, in-session only) ---------- */
+	/* ---------- Graph layer visibility (remembered across reloads) ---------- */
+
+	var LAYERS_KEY = 'karoKitEtchBoard:' + location.hostname + ':graphLayers';
+
+	/** Layers default to visible; only an explicit false hides one. */
+	function isLayerOn(layer) {
+		if (state.layers === null) {
+			try {
+				var raw = window.localStorage.getItem(LAYERS_KEY);
+				state.layers = raw ? JSON.parse(raw) : {};
+			} catch (e) { state.layers = {}; }
+		}
+		return state.layers[layer] !== false;
+	}
+
+	function setLayer(layer, on) {
+		isLayerOn(layer); // ensure state.layers is loaded before writing into it
+		state.layers[layer] = !!on;
+		try { window.localStorage.setItem(LAYERS_KEY, JSON.stringify(state.layers)); } catch (e) { /* private mode / quota */ }
+	}
+
+	/* ---------- Graph legend drag (position remembered across reloads) ---------- */
 
 	var LEGEND_DRAG_THRESHOLD = 3; // px before a press counts as a drag
+	var LEGEND_POS_KEY = 'karoKitEtchBoard:' + location.hostname + ':legendPos';
+
+	function storeLegendPos(pos) {
+		try { window.localStorage.setItem(LEGEND_POS_KEY, JSON.stringify(pos)); } catch (e) { /* private mode / quota */ }
+	}
+	function readLegendPos() {
+		try {
+			var raw = window.localStorage.getItem(LEGEND_POS_KEY);
+			return raw ? JSON.parse(raw) : null;
+		} catch (e) { return null; }
+	}
 
 	function setupLegendDrag(legend, handle) {
 		var startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false;
@@ -635,6 +679,7 @@
 			if (dragging) {
 				legend.classList.remove('etb-graph__legend--dragging');
 				state.legendPos = { left: legend.offsetLeft, top: legend.offsetTop };
+				storeLegendPos(state.legendPos);
 			}
 			dragging = false;
 		}
@@ -656,10 +701,22 @@
 		var nodeH = 44, tplNodeW = 158, compNodeW = 170, pad = 50;
 		var TWO_PI = Math.PI * 2;
 
-		var compEntries = Object.keys(state.components || {}).map(function (id) {
+		// Only components shared across two or more templates. Etch builds carry
+		// far more components than templates, and the great majority are used
+		// once or not at all — drawing those would bury the reuse web this layer
+		// exists to show, in nodes that have nothing to connect to. A component
+		// used by a single template is that template's composition, and already
+		// listed in its side panel.
+		var showComponents = isLayerOn('components');
+		var compEntries = !showComponents ? [] : Object.keys(state.components || {}).map(function (id) {
 			var c = state.components[id] || {};
-			return { id: id, label: c.label || ('Component ' + id), usedIn: c.usedIn || [] };
-		});
+			return {
+				id: id,
+				label: c.label || ('Component ' + id),
+				usedIn: c.usedIn || [],
+				usedInComponents: c.usedInComponents || [],
+			};
+		}).filter(function (c) { return c.usedIn.length >= 2; });
 
 		// -----------------------------------------------------------
 		// Radial layout, computed in an arbitrary center-at-origin space
@@ -674,9 +731,8 @@
 		var hubCount = Math.max(cols.length, 1);
 		var hubRadius = Math.max(190, hubCount * 34);
 		var maxItems = cols.reduce(function (m, c) { return Math.max(m, c.items.length); }, 1);
-		var maxTplRadius = 118 + Math.min(maxItems, 7) * 10;
+		var maxTplRadius = 118 + Math.max(0, maxItems - 1) * 14;
 		var compRingRadius = hubRadius + maxTplRadius + 90;
-		var orphanRingRadius = compRingRadius + 90;
 
 		function angularDelta(a, b) {
 			var d = Math.abs(a - b) % TWO_PI;
@@ -689,17 +745,22 @@
 			var angle = TWO_PI * (ci / hubCount) - Math.PI / 2;
 			var hx = Math.cos(angle) * hubRadius, hy = Math.sin(angle) * hubRadius;
 			var hubId = 'cat:' + c.key;
-			hubs.push({ id: hubId, label: c.label, items: c.items, x: hx, y: hy });
+			var hw = Math.max(100, c.label.length * 7 + 56);
+			hubs.push({ id: hubId, label: c.label, items: c.items, x: hx, y: hy, w: hw });
 
 			var n = c.items.length;
-			var spread = (Math.min(280, Math.max(46, n * 32)) * Math.PI) / 180;
-			var tplRadius = 118 + Math.min(n, 7) * 10;
+			var spread = (Math.min(200, Math.max(46, n * 26)) * Math.PI) / 180;
 
 			c.items.forEach(function (it, ii) {
 				var a = n > 1 ? (angle - spread / 2 + (spread * ii) / (n - 1)) : angle;
+				// Radius grows a little per item, not just a fixed spoke length: two
+				// items symmetric around the hub's own angle would otherwise land at
+				// the exact same height whenever that angle is near vertical (mirrored
+				// angles share a sine), reading as a flat horizontal row instead of a fan.
+				var tplRadius = 118 + ii * 14;
 				var tx = hx + Math.cos(a) * tplRadius, ty = hy + Math.sin(a) * tplRadius;
 				var tplId = 'tpl:' + (it.slug || it.title);
-				templates.push({ id: tplId, hubX: hx, hubY: hy, x: tx, y: ty, item: it });
+				templates.push({ id: tplId, hubId: hubId, hubX: hx, hubY: hy, x: tx, y: ty, item: it });
 				tplRawPos[tplId] = { x: tx, y: ty };
 			});
 		});
@@ -711,10 +772,10 @@
 		var MIN_ANGLE_GAP = (26 * Math.PI) / 180;
 
 		var components = compEntries.map(function (comp) {
-			return { comp: comp, orphan: comp.usedIn.length === 0, x: 0, y: 0 };
+			return { comp: comp, x: 0, y: 0 };
 		});
 
-		components.filter(function (c) { return !c.orphan; }).forEach(function (c) {
+		components.forEach(function (c) {
 			var sx = 0, sy = 0, n = 0;
 			c.comp.usedIn.forEach(function (slug) {
 				var p = tplRawPos['tpl:' + slug];
@@ -730,26 +791,28 @@
 			c.y = Math.sin(angle) * radius;
 		});
 
-		var orphanList = components.filter(function (c) { return c.orphan; });
-		orphanList.forEach(function (c, i) {
-			var angle = TWO_PI * (i / Math.max(orphanList.length, 1)) - Math.PI / 2;
-			c.x = Math.cos(angle) * orphanRingRadius;
-			c.y = Math.sin(angle) * orphanRingRadius;
-		});
-
-		// ---- Bounds -> offset so nothing sits at a negative coordinate ----
+		// ---- Bounds -> canvas sized so the ring's own center (raw origin) sits
+		// exactly at the canvas center, and the canvas is never smaller than the
+		// visible viewport — a small graph should end up centered by fitting the
+		// canvas to the viewport, not by scrolling into a canvas that's too small
+		// to scroll at all.
 		var xs = [0], ys = [0];
 		hubs.forEach(function (h) {
-			var hw = Math.max(70, h.label.length * 6.5 + 40);
-			xs.push(h.x - hw / 2, h.x + hw / 2); ys.push(h.y - 16, h.y + 16);
+			xs.push(h.x - h.w / 2, h.x + h.w / 2); ys.push(h.y - nodeH / 2, h.y + nodeH / 2);
 		});
 		templates.forEach(function (t) { xs.push(t.x - tplNodeW / 2, t.x + tplNodeW / 2); ys.push(t.y - nodeH / 2, t.y + nodeH / 2); });
 		components.forEach(function (c) { xs.push(c.x - compNodeW / 2, c.x + compNodeW / 2); ys.push(c.y - nodeH / 2, c.y + nodeH / 2); });
 
-		var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
-		var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
-		var offsetX = pad - minX, offsetY = pad - minY;
-		var width = maxX - minX + pad * 2, height = maxY - minY + pad * 2;
+		var maxAbsX = Math.max.apply(null, xs.map(Math.abs));
+		var maxAbsY = Math.max.apply(null, ys.map(Math.abs));
+
+		var bodyEl = document.getElementById('etb-body');
+		var availW = bodyEl ? bodyEl.clientWidth : 0;
+		var availH = bodyEl ? bodyEl.clientHeight : 0;
+
+		var width = Math.max(maxAbsX * 2 + pad * 2, availW);
+		var height = Math.max(maxAbsY * 2 + pad * 2, availH);
+		var offsetX = width / 2, offsetY = height / 2;
 
 		var wrap = el('div', 'etb-graph');
 		var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, width: width, height: height, class: 'etb-graph__svg' });
@@ -758,15 +821,53 @@
 		var meta = {};  // node id -> panel/tooltip data
 		var refs = {};  // node id -> template item (templates only)
 
+		// Hover or click a node -> dim everything else, keep only that node, its
+		// direct edges, and whatever's on the other end of them at full opacity.
+		// Reads data-node-id / data-from / data-to set on nodes and edges below;
+		// works on the in-memory wrap/svg for this render, so it's safe to call
+		// before they're inserted into the document.
+		function focusNode(id) {
+			wrap.classList.add('etb-graph--focused');
+			var relatedIds = [id];
+			svg.querySelectorAll('[data-from="' + id + '"], [data-to="' + id + '"]').forEach(function (edge) {
+				edge.classList.add('etb-graph__edge--active');
+				var from = edge.getAttribute('data-from'), to = edge.getAttribute('data-to');
+				if (relatedIds.indexOf(from) === -1) { relatedIds.push(from); }
+				if (relatedIds.indexOf(to) === -1) { relatedIds.push(to); }
+			});
+			svg.querySelectorAll('[data-node-id]').forEach(function (nodeEl) {
+				if (relatedIds.indexOf(nodeEl.getAttribute('data-node-id')) !== -1) {
+					nodeEl.classList.add('etb-graph__node--active');
+				}
+			});
+		}
+		function clearFocus() {
+			wrap.classList.remove('etb-graph--focused');
+			svg.querySelectorAll('.etb-graph__node--active, .etb-graph__edge--active').forEach(function (el) {
+				el.classList.remove('etb-graph__node--active');
+				el.classList.remove('etb-graph__edge--active');
+			});
+		}
+
 		function attachNodeEvents(g, id, anchorX, anchorY) {
-			g.addEventListener('mouseenter', function () { showTooltip(wrap, meta[id], anchorX, anchorY); });
-			g.addEventListener('mouseleave', function () { hideTooltip(wrap); });
+			g.setAttribute('data-node-id', id);
+			g.addEventListener('mouseenter', function () {
+				showTooltip(wrap, meta[id], anchorX, anchorY);
+				focusNode(id);
+			});
+			g.addEventListener('mouseleave', function () {
+				hideTooltip(wrap);
+				if (state.selectedNodeId) { focusNode(state.selectedNodeId); } else { clearFocus(); }
+			});
 			g.addEventListener('click', function (e) {
 				e.stopPropagation();
 				hideTooltip(wrap);
-				if (state.selectedNodeId === id) { state.selectedNodeId = null; closeGraphPanel(wrap); return; }
+				if (state.selectedNodeId === id) {
+					state.selectedNodeId = null; closeGraphPanel(wrap); clearFocus(); return;
+				}
 				state.selectedNodeId = id;
 				showGraphPanel(wrap, meta[id], refs[id]);
+				focusNode(id);
 			});
 		}
 
@@ -779,11 +880,12 @@
 				listLabel: 'Templates', items: h.items.map(function (it) { return it.title; }),
 			};
 
-			var hubG = svgEl('g', { class: 'etb-graph__hub-node', tabindex: '0', role: 'button' });
-			var hubText = svgEl('text', { x: hx, y: hy, 'text-anchor': 'middle', class: 'etb-graph__hub' });
+			var hubG = svgEl('g', { class: 'etb-graph__node etb-graph__node--category', tabindex: '0', role: 'button' });
+			hubG.appendChild(svgEl('rect', { x: hx - h.w / 2, y: hy - nodeH / 2, width: h.w, height: nodeH, rx: 8 }));
+			var hubText = svgEl('text', { x: hx, y: hy + 5, 'text-anchor': 'middle', class: 'etb-graph__label etb-graph__label--hub' });
 			hubText.textContent = h.label + ' (' + h.items.length + ')';
 			hubG.appendChild(hubText);
-			attachNodeEvents(hubG, h.id, hx, hy - 10);
+			attachNodeEvents(hubG, h.id, hx, hy - nodeH / 2);
 			svg.appendChild(hubG);
 		});
 
@@ -802,7 +904,7 @@
 				listLabel: 'Composition', items: compLabels,
 			};
 
-			svg.appendChild(svgEl('line', { x1: hx, y1: hy, x2: tx, y2: ty, class: 'etb-graph__edge' }));
+			svg.appendChild(svgEl('line', { x1: hx, y1: hy, x2: tx, y2: ty, class: 'etb-graph__edge', 'data-from': t.hubId, 'data-to': t.id }));
 
 			var statusCls = t.item.status && t.item.status !== 'live' ? ' etb-graph__node--' + t.item.status : '';
 			var typeCls = ' etb-graph__node--' + String(t.item.type || 'single').toLowerCase();
@@ -811,33 +913,50 @@
 			var t2 = svgEl('text', { x: tx, y: ty + 5, 'text-anchor': 'middle', class: 'etb-graph__label' });
 			t2.textContent = t.item.title;
 			g.appendChild(t2);
+			// Anything not yet live gets a status dot in the corner, so status and
+			// type stay readable at the same time.
+			if (statusCls) {
+				g.appendChild(svgEl('circle', { cx: tx + tplNodeW / 2 - 9, cy: ty - nodeH / 2 + 9, r: 4, class: 'etb-graph__dot' }));
+			}
 			attachNodeEvents(g, t.id, tx, ty - nodeH / 2);
 			svg.appendChild(g);
 		});
 
-		// Shared components: solid edges to every template that uses them; unused ones sit on the outer halo, unconnected.
+		// Shared components: a dashed edge to each template that uses them.
 		components.forEach(function (c) {
 			var cx = c.x + offsetX, cy = c.y + offsetY;
 			var compId = 'comp:' + c.comp.id;
+			var tplUses = c.comp.usedIn.length;
+			var compUses = c.comp.usedInComponents.length;
+			var useBits = [tplUses + ' template' + (tplUses === 1 ? '' : 's')];
+			if (compUses) { useBits.push(compUses + ' component' + (compUses === 1 ? '' : 's')); }
 			meta[compId] = {
 				title: '\u29C9 ' + c.comp.label,
-				subtitle: c.orphan
-					? 'shared component \u00B7 not used in any template'
-					: 'shared component \u00B7 used in ' + c.comp.usedIn.length + ' template' + (c.comp.usedIn.length === 1 ? '' : 's'),
-				listLabel: 'Used in', items: c.comp.usedIn,
+				subtitle: 'shared component \u00B7 used in ' + useBits.join(' + '),
+				listLabel: 'Used in templates', items: c.comp.usedIn,
+				listLabel2: 'Nested in components', items2: c.comp.usedInComponents,
 			};
 
-			if (!c.orphan) {
-				c.comp.usedIn.forEach(function (slug) {
-					var p = pos['tpl:' + slug];
-					if (p) { svg.appendChild(svgEl('line', { x1: p.x, y1: p.y, x2: cx, y2: cy, class: 'etb-graph__edge etb-graph__edge--component' })); }
-				});
-			}
+			// Edge weight scales with how widely shared the component is, so a
+			// heavily-reused component reads as a thicker hub even before hovering.
+			var edgeWidth = 1 + Math.min(tplUses, 6) * 0.3;
+			c.comp.usedIn.forEach(function (slug) {
+				var p = pos['tpl:' + slug];
+				if (p) {
+					var edge = svgEl('line', { x1: p.x, y1: p.y, x2: cx, y2: cy, class: 'etb-graph__edge etb-graph__edge--component', 'data-from': 'tpl:' + slug, 'data-to': compId });
+					edge.style.strokeWidth = edgeWidth;
+					svg.appendChild(edge);
+				}
+			});
 
-			var g = svgEl('g', { class: 'etb-graph__node etb-graph__node--component' + (c.orphan ? ' etb-graph__node--orphan' : ''), tabindex: '0', role: 'button' });
+			// Components used in several places (the highest blast-radius ones to
+			// edit) get a bolder tier of their own, not just the plain color.
+			var totalUses = tplUses + compUses;
+			var sharedCls = totalUses >= 3 ? ' etb-graph__node--shared' : '';
+			var g = svgEl('g', { class: 'etb-graph__node etb-graph__node--component' + sharedCls, tabindex: '0', role: 'button' });
 			g.appendChild(svgEl('rect', { x: cx - compNodeW / 2, y: cy - nodeH / 2, width: compNodeW, height: nodeH, rx: 8 }));
 			var t3 = svgEl('text', { x: cx, y: cy + 5, 'text-anchor': 'middle', class: 'etb-graph__label' });
-			t3.textContent = c.comp.label;
+			t3.textContent = c.comp.label + ' (' + totalUses + ')';
 			g.appendChild(t3);
 			attachNodeEvents(g, compId, cx, cy);
 			svg.appendChild(g);
@@ -852,21 +971,40 @@
 		legendHandle.appendChild(gripIcon());
 		legendHandle.appendChild(el('span', null, 'Legend'));
 		legend.appendChild(legendHandle);
+		// Rows carrying a `layer` are switches as well as keys — clicking one
+		// drops that layer out of the graph. Category hubs and template types
+		// aren't offered: they're the structure everything else hangs off, so
+		// hiding them would leave a graph of edges pointing at nothing.
 		[
 			['category', 'Category'], ['single', 'Single template'], ['archive', 'Archive template'],
-			['system', 'System template'], ['component', 'Shared component'], ['orphan', 'Unused component'],
+			['system', 'System template'], ['component', 'Shared component', 'components'],
 		].forEach(function (row) {
-			var r = el('div', 'etb-graph__legend-row');
+			var layer = row[2];
+			var on = !layer || isLayerOn(layer);
+			var r = el(layer ? 'button' : 'div', 'etb-graph__legend-row' + (layer ? ' etb-graph__legend-row--toggle' : '') + (on ? '' : ' is-off'));
 			var dot = el('span', 'etb-graph__legend-dot');
-			dot.style.background = 'var(--etb-c-' + row[0] + ')';
+			dot.style.background = 'var(--etb-c-' + row[0] + '-node)';
 			r.appendChild(dot);
 			r.appendChild(el('span', null, row[1]));
+			if (layer) {
+				r.type = 'button';
+				r.setAttribute('aria-pressed', on ? 'true' : 'false');
+				r.title = (on ? 'Hide ' : 'Show ') + row[1].toLowerCase() + 's';
+				r.addEventListener('click', function (e) {
+					e.stopPropagation();
+					setLayer(layer, !isLayerOn(layer));
+					renderBody();
+				});
+			}
 			legend.appendChild(r);
 		});
-		var reuse = el('div', 'etb-graph__legend-row');
-		reuse.appendChild(el('span', 'etb-graph__legend-dash'));
-		reuse.appendChild(el('span', null, 'reused by'));
-		legend.appendChild(reuse);
+		if (showComponents) {
+			var reuse = el('div', 'etb-graph__legend-row');
+			reuse.appendChild(el('span', 'etb-graph__legend-dash'));
+			reuse.appendChild(el('span', null, 'reused by'));
+			legend.appendChild(reuse);
+		}
+		if (!state.legendPos) { state.legendPos = readLegendPos(); }
 		if (state.legendPos) {
 			legend.style.left = state.legendPos.left + 'px';
 			legend.style.top = state.legendPos.top + 'px';
@@ -888,9 +1026,22 @@
 		zoom.appendChild(zOut); zoom.appendChild(zLabel); zoom.appendChild(zIn);
 		wrap.appendChild(zoom);
 
-		// Keep an open panel across re-renders (e.g. after a status change).
+		// Keep an open panel (and its focus/dim state) across re-renders (e.g. after a status change).
 		if (state.selectedNodeId && meta[state.selectedNodeId]) {
 			showGraphPanel(wrap, meta[state.selectedNodeId], refs[state.selectedNodeId]);
+			focusNode(state.selectedNodeId);
+		}
+
+		// Center the hub ring in the viewport on first entering graph view (not on
+		// every re-render, or a filter/status change would yank back an intentional
+		// scroll/pan). offsetX/offsetY is where the ring's own center (raw origin)
+		// lands in final SVG coordinates. Needs a frame so wrap has real dimensions.
+		if (state.graphNeedsCenter) {
+			state.graphNeedsCenter = false;
+			requestAnimationFrame(function () {
+				wrap.scrollLeft = Math.max(0, offsetX * state.graphZoom - wrap.clientWidth / 2);
+				wrap.scrollTop = Math.max(0, offsetY * state.graphZoom - wrap.clientHeight / 2);
+			});
 		}
 
 		return wrap;
@@ -925,6 +1076,7 @@
 		toggle.addEventListener('click', function () {
 			state.view = state.view === 'graph' ? 'board' : 'graph';
 			state.selectedNodeId = null;
+			if (state.view === 'graph') { state.graphNeedsCenter = true; }
 			renderHeaderInto();
 			renderBody();
 		});
@@ -999,6 +1151,14 @@
 				state.selectedNodeId = null;
 				var panel = root.querySelector('.etb-graph__panel');
 				if (panel) { panel.remove(); }
+				var graphWrap = root.querySelector('.etb-graph');
+				if (graphWrap) {
+					graphWrap.classList.remove('etb-graph--focused');
+					graphWrap.querySelectorAll('.etb-graph__node--active, .etb-graph__edge--active').forEach(function (el) {
+						el.classList.remove('etb-graph__node--active');
+						el.classList.remove('etb-graph__edge--active');
+					});
+				}
 			}
 		});
 		host.appendChild(root);

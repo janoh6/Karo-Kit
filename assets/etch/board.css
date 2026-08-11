@@ -33,7 +33,19 @@
 	--etb-c-archive: oklch(75% 0.14 70);
 	--etb-c-system: oklch(60% 0.01 280);
 	--etb-c-component: oklch(80% 0.16 130);
-	--etb-c-orphan: var(--etb-danger);
+	/* As-rendered node border colors — muted toward --etb-border-strong, same
+	   blend the graph nodes themselves use. The legend swatches read from
+	   these too, so they preview what a node actually looks like rather than
+	   a more saturated color nothing on the canvas shows. */
+	--etb-c-category-node: color-mix(in oklch, var(--etb-c-category) 60%, var(--etb-border-strong));
+	--etb-c-single-node: color-mix(in oklch, var(--etb-c-single) 60%, var(--etb-border-strong));
+	--etb-c-archive-node: color-mix(in oklch, var(--etb-c-archive) 60%, var(--etb-border-strong));
+	--etb-c-system-node: color-mix(in oklch, var(--etb-c-system) 60%, var(--etb-border-strong));
+	--etb-c-component-node: color-mix(in oklch, var(--etb-c-component) 55%, var(--etb-border-strong));
+	/* Status (the corner dot) — a separate axis from node type. */
+	--etb-c-wip: oklch(78% 0.15 75);
+	--etb-c-review: oklch(75% 0.13 240);
+	--etb-c-ready: oklch(76% 0.15 150);
 
 	font-family: var(--etb-font);
 	color: var(--etb-text);
@@ -505,6 +517,28 @@
 .etb-graph__legend-dot { width: 0.625rem; height: 0.625rem; border-radius: 0.1875rem; flex-shrink: 0; }
 .etb-graph__legend-dash { width: 1rem; height: 0; border-top: 1.5px dashed var(--etb-c-component); flex-shrink: 0; }
 
+/* Legend rows that double as layer switches. */
+.etb-graph__legend-row--toggle {
+	background: none;
+	border: 0;
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	font: inherit;
+	font-size: 0.75rem;
+	text-align: left;
+	cursor: pointer;
+}
+.etb-graph__legend-row--toggle:hover { color: var(--etb-text); }
+.etb-graph__legend-row--toggle:focus-visible { outline: 1px solid var(--etb-accent); outline-offset: 2px; border-radius: 0.25rem; }
+.etb-graph__legend-row--toggle.is-off { opacity: 0.4; }
+/* Hollow the swatch when its layer is hidden, so "off" is legible without
+   relying on the dimming alone. */
+.etb-graph__legend-row--toggle.is-off .etb-graph__legend-dot {
+	background: transparent !important;
+	box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
 /* Zoom controls */
 .etb-graph__zoom { position: absolute; top: 1rem; right: 1.25rem; z-index: 5; display: flex; gap: 0.375rem; }
 .etb-graph__zoom button {
@@ -522,17 +556,13 @@
 .etb-graph__zoom button:hover { border-color: oklch(50% 0.01 280); }
 .etb-graph__zoom .etb-graph__zoom-label { font-size: 0.75rem; color: var(--etb-text-muted); }
 
-.etb-graph__hub {
-	fill: var(--etb-text);
-	font-size: 13px;
-	font-weight: 700;
-	cursor: pointer;
-	user-select: none;
-}
-.etb-graph__hub-node:hover .etb-graph__hub,
-.etb-graph__hub-node:focus-visible .etb-graph__hub { fill: var(--etb-accent); }
+.etb-graph__label--hub { font-size: 13px; font-weight: 700; }
 
-.etb-graph__edge { stroke: var(--etb-border-strong); stroke-width: 1.5; }
+.etb-graph__edge {
+	stroke: var(--etb-border-strong);
+	stroke-width: 1.5;
+	transition: opacity 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
+}
 .etb-graph__edge--component {
 	stroke: var(--etb-c-component);
 	stroke-width: 1.25;
@@ -540,7 +570,22 @@
 	opacity: 0.55;
 }
 
-.etb-graph__node { cursor: pointer; }
+/* Hover/click a node: dim everything except it, its direct edges, and
+   whatever's on the other end of them. */
+.etb-graph--focused .etb-graph__node,
+.etb-graph--focused .etb-graph__edge { opacity: 0.22; }
+.etb-graph--focused .etb-graph__node--active { opacity: 1; }
+.etb-graph--focused .etb-graph__edge--active {
+	opacity: 1;
+	stroke: var(--etb-accent);
+	stroke-width: 2;
+}
+.etb-graph--focused .etb-graph__edge--active.etb-graph__edge--component {
+	stroke: var(--etb-c-component);
+	stroke-width: 2;
+}
+
+.etb-graph__node { cursor: pointer; transition: opacity 0.15s ease; }
 .etb-graph__node rect {
 	fill: var(--etb-surface);
 	stroke: var(--etb-border-strong);
@@ -551,13 +596,19 @@
 .etb-graph__node:focus-visible rect { stroke: var(--etb-accent); fill: var(--etb-surface-hover); }
 
 /* Node color-coding by template type */
-.etb-graph__node--single rect  { stroke: color-mix(in oklch, var(--etb-c-single) 60%, var(--etb-border-strong)); }
-.etb-graph__node--archive rect { stroke: color-mix(in oklch, var(--etb-c-archive) 60%, var(--etb-border-strong)); }
-.etb-graph__node--system rect  { stroke: color-mix(in oklch, var(--etb-c-system) 60%, var(--etb-border-strong)); }
-.etb-graph__node--single .etb-graph__dot  { fill: var(--etb-c-single); }
-.etb-graph__node--archive .etb-graph__dot { fill: var(--etb-c-archive); }
-.etb-graph__node--system .etb-graph__dot  { fill: var(--etb-c-system); }
-.etb-graph__dot { fill: var(--etb-c-single); }
+.etb-graph__node--single rect  { stroke: var(--etb-c-single-node); }
+.etb-graph__node--archive rect { stroke: var(--etb-c-archive-node); }
+.etb-graph__node--system rect  { stroke: var(--etb-c-system-node); }
+
+/* Status rides a corner dot, never the border. Status used to restyle the
+   border itself, which both overrode the type color (equal specificity, later
+   in the file) and painted WIP in an amber all but identical to the archive
+   color — so a WIP single template read as an archive and contradicted the
+   legend it sits next to. */
+.etb-graph__dot { fill: var(--etb-text-muted); stroke: var(--etb-bg); stroke-width: 1.5; }
+.etb-graph__node--wip .etb-graph__dot    { fill: var(--etb-c-wip); }
+.etb-graph__node--review .etb-graph__dot { fill: var(--etb-c-review); }
+.etb-graph__node--ready .etb-graph__dot  { fill: var(--etb-c-ready); }
 .etb-graph__label {
 	fill: var(--etb-text);
 	font-size: 12.5px;
@@ -568,18 +619,19 @@
 
 .etb-graph__node--component rect {
 	fill: color-mix(in oklch, var(--etb-c-component) 12%, var(--etb-surface));
-	stroke: color-mix(in oklch, var(--etb-c-component) 55%, var(--etb-border-strong));
+	stroke: var(--etb-c-component-node);
 	stroke-dasharray: 3 2;
 }
-.etb-graph__node--orphan rect {
-	fill: color-mix(in oklch, var(--etb-c-orphan) 10%, var(--etb-surface));
-	stroke: color-mix(in oklch, var(--etb-c-orphan) 65%, var(--etb-border-strong));
+/* Used by 3+ templates: the components worth thinking twice before editing. */
+.etb-graph__node--shared rect {
+	fill: color-mix(in oklch, var(--etb-c-component) 20%, var(--etb-surface));
+	stroke-width: 2;
 }
-.etb-graph__node--orphan .etb-graph__label { fill: color-mix(in oklch, var(--etb-c-orphan) 80%, var(--etb-text)); }
-.etb-graph__hub-node .etb-graph__hub { fill: var(--etb-c-category); }
-.etb-graph__node--wip rect { stroke: oklch(78% 0.15 75); }
-.etb-graph__node--review rect { stroke: oklch(75% 0.13 240); }
-.etb-graph__node--ready rect { stroke: oklch(76% 0.15 150); }
+.etb-graph__node--shared .etb-graph__label { font-weight: 700; }
+.etb-graph__node--category rect {
+	fill: color-mix(in oklch, var(--etb-c-category) 10%, var(--etb-surface));
+	stroke: var(--etb-c-category-node);
+}
 
 .etb-graph__tooltip {
 	position: absolute;
