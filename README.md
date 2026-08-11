@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.13.0
+Stable tag: 0.14.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,38 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.14.0 =
+* Fix: Graph view never showed a single shared component on an Etch site. It
+  looked for `core/block`, the block WordPress uses for synced patterns; Etch
+  components are `etch/component`, pointing at the same kind of reusable post
+  under a different name. On the build this was found on, no template used
+  `core/block` at all — so the layer the graph exists to show was always empty.
+* Fix: a component used only inside another component counted as used by
+  nothing, because usage was read from templates alone. Component posts are
+  now walked too, and that kind of nesting is listed separately from template
+  use — "nothing uses this" and "no template uses this directly" are very
+  different things to say about something you may be about to delete.
+* Fix: a component placed twice in one template counted as two uses.
+* Fix: template status was drawn on the node border, where it overrode the
+  border colour carrying template type — and WIP's amber is barely
+  distinguishable from the archive amber, so a WIP single template looked like
+  an archive and disagreed with the legend beside it. Status now sits in a
+  corner dot and type keeps the border. Legend swatches show the colour a node
+  is actually drawn in, rather than a more saturated version of it.
+* Change: Graph view is laid out radially — category hubs ring a centre point
+  and each hub's templates fan out around it, instead of hubs in a row with
+  their templates stacked underneath. The graph also opens centred in the
+  view rather than pinned to the top-left corner.
+* Add: hovering or selecting a node fades everything except that node, its
+  connections, and whatever sits on the other end of them.
+* Add: shared components carry their usage count, with heavily-reused ones
+  drawn more prominently; components used by only one template are left out,
+  since a component used once is that template's composition and is already
+  listed in its panel.
+* Add: the component layer can be switched off from the legend, and the legend
+  itself can be dragged out of the way. Both the position and the layer choice
+  are remembered per site.
 
 = 0.13.0 =
 * Add: a "Custom colour" option on the accent picker — a plain hex field,
