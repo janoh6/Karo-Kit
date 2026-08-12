@@ -310,7 +310,6 @@ final class Karo_Kit_Etch_Board {
 				'slug'         => $t->slug,
 				'type'         => self::derive_type( $t->slug ),
 				'url'          => self::front_end_url( $t->slug ),
-				'previewUrl'   => self::preview_url( $t->slug ),
 				'thumbUrl'     => self::thumb_url_for( $t->slug ),
 				'stale'        => self::is_stale( $t->slug ),
 				'status'       => self::get_status( $t->slug ),
@@ -622,32 +621,56 @@ final class Karo_Kit_Etch_Board {
 
 	/* ---- Standalone template preview (screenshot target) ----------------- */
 
-	/** Public URL that renders a template standalone for screenshotting. */
+	/** How long a minted preview link stays valid before it 404s outright. */
+	const PREVIEW_TOKEN_TTL = 60;
+
+	/**
+	 * Time-boxed URL that renders a template standalone.
+	 *
+	 * Must be publicly reachable — the screenshot service fetches it with no
+	 * WordPress auth of its own — so this used to key the route on the template
+	 * slug directly: permanent and guessable (`index`, `single`, `404`...),
+	 * meaning anyone who found or guessed it could browse every template on an
+	 * unlaunched or NDA'd site indefinitely. The route now takes a random token
+	 * minted per call, valid for PREVIEW_TOKEN_TTL seconds, so knowing the URL
+	 * is worth nothing outside the narrow window a real thumbnail request is
+	 * actually in flight.
+	 *
+	 * Deliberately not single-use: generate_thumbnail() fetches this exact URL
+	 * twice — once to verify it renders before spending a call on the remote
+	 * service, then again as the URL handed to that service — so the token has
+	 * to survive more than one read. The TTL alone already closes the real
+	 * problem; a 32-character random value is not a thing worth guessing at,
+	 * 60-second window or not.
+	 */
 	private static function preview_url( $slug ): string {
-		return add_query_arg( 'karo_kit_etch_preview', rawurlencode( $slug ), home_url( '/' ) );
+		$token = wp_generate_password( 32, false, false );
+		set_transient( 'karo_kit_etch_preview_' . $token, $slug, self::PREVIEW_TOKEN_TTL );
+		return add_query_arg( 'karo_kit_etch_preview', $token, home_url( '/' ) );
 	}
 
 	/**
-	 * Render a template standalone at /?karo_kit_etch_preview={slug}. Must be
-	 * public so the screenshot service can reach it; only renders known
-	 * template slugs and is marked noindex.
+	 * Render a template standalone at /?karo_kit_etch_preview={token}. Must be
+	 * public so the screenshot service can reach it; the token is what limits
+	 * that to a real, in-flight thumbnail request rather than standing access.
 	 */
 	public static function maybe_render_preview(): void {
-		$slug = sanitize_title( (string) get_query_var( 'karo_kit_etch_preview' ) );
-		if ( '' === $slug ) {
+		$token = sanitize_text_field( (string) get_query_var( 'karo_kit_etch_preview' ) );
+		if ( '' === $token ) {
 			return;
 		}
 
 		header( 'X-Robots-Tag: noindex, nofollow', true );
 
-		$template = self::find_template( $slug );
+		$slug     = get_transient( 'karo_kit_etch_preview_' . $token );
+		$template = $slug ? self::find_template( (string) $slug ) : null;
 		if ( ! $template ) {
 			status_header( 404 );
 			echo 'Template not found';
 			exit;
 		}
 
-		self::setup_preview_context( $slug );
+		self::setup_preview_context( (string) $slug );
 		status_header( 200 );
 
 		$content = $template->content ?? '';
