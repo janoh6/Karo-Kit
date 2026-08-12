@@ -177,8 +177,11 @@
 	align-items: flex-start;
 	height: 100%;
 	padding: 1rem 1.75rem 1.375rem 1.75rem;
-	overflow-x: auto;
-	overflow-y: hidden;
+	overflow: auto;
+	/* One scrollbar for the whole board, on whichever axis has too much
+	   content — same as the existing horizontal one, just extended to
+	   vertical instead of giving every column its own separate scrollbar
+	   (see .etb-column / .etb-column__list below). */
 	scrollbar-width: thin;
 	scrollbar-color: var(--etb-border) transparent;
 	mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--etb-gap)), transparent 100%);
@@ -190,8 +193,10 @@
 	flex: 0 0 var(--etb-column-width);
 	display: flex;
 	flex-direction: column;
-	min-height: 0;
-	max-height: 100%;
+	/* No max-height here on purpose: a column grows to fit its own cards,
+	   and .etb-board__track (the scroll container above) handles the
+	   overflow for the whole board at once, vertically as well as
+	   horizontally, rather than each column clipping/scrolling on its own. */
 	background: var(--etb-panel);
 	border: 1px solid var(--etb-border);
 	border-radius: var(--etb-radius);
@@ -275,9 +280,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
-	overflow-y: auto;
 	min-height: 3.75rem;
-	scrollbar-width: thin;
 	padding: 0.125rem 0.75rem 0.875rem 0.75rem;
 }
 

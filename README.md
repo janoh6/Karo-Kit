@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.2
+Stable tag: 0.16.3
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,15 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.3 =
+* Change: a Template Board column used to scroll its cards internally once
+  they didn't fit the visible height — which, combined with the taller 4:3
+  thumbnails added in 0.16.2, meant even a column with only 3 cards could
+  end up with its own private scrollbar. Columns now just grow to fit their
+  cards, and the board scrolls vertically as a whole, the same way it
+  already scrolled horizontally — one scrollbar for the whole board instead
+  of a separate one on every column that happens to run long.
 
 = 0.16.2 =
 * Change: Template Board card thumbnails are now a 4:3 box instead of a
