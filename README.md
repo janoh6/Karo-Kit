@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.0
+Stable tag: 0.16.1
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,18 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.1 =
+* Fix: a Template Board column with more cards than fit its visible height
+  squashed every card in it down toward zero height instead of leaving them
+  full-size and scrolling. `.etb-column__list` is a flex column with
+  `overflow-y: auto`, but its cards never opted out of the default
+  `flex-shrink: 1` — and since each card also sets `overflow: hidden`, its
+  automatic minimum height resolved to 0 rather than its content size,
+  leaving nothing to stop flexbox shrinking it arbitrarily far. Cards now
+  set `flex-shrink: 0`, matching the same protection already used elsewhere
+  in the board (thumbnails, column-header buttons); overflow now scrolls
+  the column instead of crushing its contents.
 
 = 0.16.0 =
 * Add: Karo Kit can now check GitHub Releases for updates from wp-admin.

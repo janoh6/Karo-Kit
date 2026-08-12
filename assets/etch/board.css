@@ -315,6 +315,12 @@
 	cursor: pointer;
 	display: flex;
 	flex-direction: column;
+	/* .etb-column__list is itself flex-column + overflow-y:auto, so a card
+	   with the default flex-shrink:1 gets squashed toward zero height once
+	   the column has more cards than fit — the whole point of overflow:auto
+	   here is to scroll them, not shrink them. overflow:hidden also zeroes
+	   a flex item's automatic min-height, so nothing else was stopping it. */
+	flex-shrink: 0;
 	border: 1px solid var(--etb-border);
 	border-radius: var(--etb-radius-s);
 	background: var(--etb-surface);
