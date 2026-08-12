@@ -366,6 +366,14 @@
 @media (prefers-reduced-motion: reduce) {
 	.etb-card__thumb.is-generating::after { animation: none; }
 }
+/* Auto-generation hit its per-visit cap — waiting on a manual "Generate
+   thumbnail" rather than actively working, so it reads differently from the
+   shimmering .is-generating state above. */
+.etb-card__thumb--needs-generate { cursor: default; }
+.etb-card__thumb--needs-generate .etb-card__thumb-label {
+	color: var(--etb-c-archive-node);
+	letter-spacing: 0;
+}
 
 .etb-card__footer {
 	display: flex;

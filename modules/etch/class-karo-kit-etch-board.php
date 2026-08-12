@@ -21,11 +21,12 @@ final class Karo_Kit_Etch_Board {
 
 	const REST_NAMESPACE = 'karo-kit/v1';
 
-	const ENABLED_OPT   = 'karo_kit_etch_board_on';
-	const ORDER_OPT     = 'karo_kit_etch_order';
-	const THUMB_OPT     = 'karo_kit_etch_thumbs';
-	const STATUS_OPT    = 'karo_kit_etch_status';
-	const THRESHOLD_OPT = 'karo_kit_etch_thumb_threshold';
+	const ENABLED_OPT    = 'karo_kit_etch_board_on';
+	const ORDER_OPT      = 'karo_kit_etch_order';
+	const THUMB_OPT      = 'karo_kit_etch_thumbs';
+	const STATUS_OPT     = 'karo_kit_etch_status';
+	const THRESHOLD_OPT  = 'karo_kit_etch_thumb_threshold';
+	const AUTO_LIMIT_OPT = 'karo_kit_etch_thumb_auto_limit';
 
 	/**
 	 * Upload subdirectory for generated thumbnails. Deliberately keeps the
@@ -143,8 +144,9 @@ final class Karo_Kit_Etch_Board {
 			'data'    => array(
 				'name'  => 'KaroKitEtchData',
 				'value' => array(
-					'restBase' => esc_url_raw( rest_url( self::REST_NAMESPACE . '/etch' ) ),
-					'nonce'    => $nonce,
+					'restBase'      => esc_url_raw( rest_url( self::REST_NAMESPACE . '/etch' ) ),
+					'nonce'         => $nonce,
+					'autoThumbLimit' => self::get_auto_limit(),
 				),
 			),
 			// Bridge first (exposes the bridge global), then the board that consumes it.
@@ -244,6 +246,21 @@ final class Karo_Kit_Etch_Board {
 	public static function get_threshold(): int {
 		$t = (int) get_option( self::THRESHOLD_OPT, 3 );
 		return $t > 0 ? $t : 3;
+	}
+
+	/**
+	 * How many missing/stale thumbnails the board captures on its own per
+	 * visit, before leaving the rest for a manual "Generate thumbnail".
+	 *
+	 * Capture now happens in the admin's own browser rather than on a remote
+	 * server, so every auto-queued thumbnail is real time in that tab — a
+	 * board with a lot of missing thumbnails at once (a fresh install, or the
+	 * first open after upgrading from the old remote-screenshot version) would
+	 * otherwise start working through all of them unasked. 0 turns auto-
+	 * generation off entirely; every thumbnail is then a deliberate action.
+	 */
+	public static function get_auto_limit(): int {
+		return max( 0, (int) get_option( self::AUTO_LIMIT_OPT, 6 ) );
 	}
 
 	/* ---- Template lifecycle ---------------------------------------------- */

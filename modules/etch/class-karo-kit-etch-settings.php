@@ -53,6 +53,11 @@ final class Karo_Kit_Etch_Settings {
 			'sanitize_callback' => 'absint',
 			'default'           => 3,
 		) );
+		register_setting( $group, Karo_Kit_Etch_Board::AUTO_LIMIT_OPT, array(
+			'type'              => 'integer',
+			'sanitize_callback' => 'absint',
+			'default'           => 6,
+		) );
 
 		// --- Section: Template Board ---
 		add_settings_section( 'karo_kit_etch_board', __( 'Template Board', 'karo-kit' ),
@@ -63,6 +68,9 @@ final class Karo_Kit_Etch_Settings {
 
 		add_settings_field( Karo_Kit_Etch_Board::THRESHOLD_OPT, __( 'Regenerate thumbnail after', 'karo-kit' ),
 			array( __CLASS__, 'field_threshold' ), $slug, 'karo_kit_etch_board' );
+
+		add_settings_field( Karo_Kit_Etch_Board::AUTO_LIMIT_OPT, __( 'Auto-generate up to', 'karo-kit' ),
+			array( __CLASS__, 'field_auto_limit' ), $slug, 'karo_kit_etch_board' );
 
 		// --- Section: Structure Arrows ---
 		register_setting( $group, Karo_Kit_Etch_Structure::ENABLED_OPT, array(
@@ -196,6 +204,16 @@ final class Karo_Kit_Etch_Settings {
 			esc_html__( 'saves', 'karo-kit' )
 		);
 		echo '<p class="description">' . esc_html__( 'How many times a template is saved before its thumbnail is treated as stale and regenerated.', 'karo-kit' ) . '</p>';
+	}
+
+	public static function field_auto_limit(): void {
+		printf(
+			'<input type="number" min="0" class="small-text" name="%s" value="%d"> %s',
+			esc_attr( Karo_Kit_Etch_Board::AUTO_LIMIT_OPT ),
+			Karo_Kit_Etch_Board::get_auto_limit(),
+			esc_html__( 'thumbnails per visit', 'karo-kit' )
+		);
+		echo '<p class="description">' . esc_html__( 'Thumbnails are captured in your own browser, so each one takes a few real seconds. The board generates up to this many missing or stale thumbnails automatically when you open it; the rest wait for "Generate thumbnail" from a card\'s menu. 0 turns off automatic generation entirely.', 'karo-kit' ) . '</p>';
 	}
 
 	/* ---- Structure Arrows ------------------------------------------------ */

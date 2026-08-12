@@ -137,6 +137,34 @@
 		if (!thumbBusy) { processThumbQueue(); }
 	}
 
+	// Distinct slugs this board session has already offered an automatic
+	// capture, win or lose — a retry after failure shouldn't spend budget
+	// twice, and re-rendering (a status change, a filter) shouldn't either.
+	var autoQueuedSlugs = {};
+
+	/**
+	 * Queue a capture automatically, up to autoThumbLimit distinct thumbnails
+	 * per visit. Past the cap, the card is left showing "needs a thumbnail"
+	 * and picks up a "Generate thumbnail" action in its menu instead.
+	 *
+	 * Capture now happens in this tab (see captureTemplate below) rather than
+	 * on a remote server, so every one queued here is real time the admin's
+	 * browser spends without being asked — fine for a handful, not fine for
+	 * every missing thumbnail on a board that just adopted this feature.
+	 */
+	function maybeAutoQueueThumb(slug, thumbEl) {
+		if (thumbInFlight[slug]) { queueThumb(slug, thumbEl); return; }
+		var limit = typeof DATA.autoThumbLimit === 'number' ? DATA.autoThumbLimit : 6;
+		if (!autoQueuedSlugs[slug] && Object.keys(autoQueuedSlugs).length >= limit) {
+			thumbEl.classList.add('etb-card__thumb--needs-generate');
+			var label = thumbEl.querySelector('.etb-card__thumb-label');
+			if (label) { label.textContent = 'generate from menu'; }
+			return;
+		}
+		autoQueuedSlugs[slug] = true;
+		queueThumb(slug, thumbEl);
+	}
+
 	var CAPTURE_WIDTH = 1280;
 	var CAPTURE_TIMEOUT = 20000;
 
@@ -387,6 +415,22 @@
 		});
 		menu.appendChild(statusBtn);
 
+		if (item.slug && (!item.thumbUrl || item.stale)) {
+			var thumbBtn = el('button', 'etb-menu__item', 'Generate thumbnail');
+			thumbBtn.type = 'button';
+			thumbBtn.addEventListener('click', function (e) {
+				e.stopPropagation();
+				closeMenus();
+				var card = anchor.closest('.etb-card');
+				var thumbEl = card && card.querySelector('.etb-card__thumb');
+				if (thumbEl) {
+					thumbEl.classList.remove('etb-card__thumb--needs-generate');
+					queueThumb(item.slug, thumbEl);
+				}
+			});
+			menu.appendChild(thumbBtn);
+		}
+
 		var isReset = item.destructive === 'reset';
 		var danger = el('button', 'etb-menu__item etb-menu__item--danger', isReset ? 'Reset' : 'Delete');
 		danger.type = 'button';
@@ -425,7 +469,7 @@
 		}
 		card.appendChild(thumb);
 		if (item.slug && (!item.thumbUrl || item.stale)) {
-			queueThumb(item.slug, thumb);
+			maybeAutoQueueThumb(item.slug, thumb);
 		} else if (!item.slug && !item.thumbUrl && !warnedNoSlug[item.title]) {
 			warnedNoSlug[item.title] = true;
 			console.warn('KaroKitEtch: could not resolve a slug for "' + item.title + '" — thumbnail skipped (title may not match a template slug)');
