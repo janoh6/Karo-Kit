@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.14.0
+Stable tag: 0.14.1
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,25 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.14.1 =
+* Security: a failed login locked out the whole IP address, so five wrong
+  passwords from an office network — or any address shared behind CGNAT — shut
+  out every other person on it. A login now counts against the account being
+  tried as well as the address, with a looser address-wide limit still in place
+  so that trying a few passwords against each of a long list of usernames is
+  no way around it. Registration is unchanged: it has no account to defend.
+* Security: the rate limiter keyed its rows on an unsalted MD5 of the visitor's
+  IP, which reverses by brute force in minutes — the whole address space is
+  only four billion values — so it read as anonymised without being so. It now
+  uses WordPress's own salted hash. Existing rows stop matching and are cleared
+  by the daily purge; an active lockout may restart, which is harmless.
+* Performance: opening the Template Board re-parsed every template and every
+  component from scratch, twice over for templates, since the two data sources
+  behind the board each parsed the same markup separately. They now share one
+  index, built in a single pass and kept until a template or component is
+  saved. On a build with 59 components that is roughly 470 KB of markup parsed
+  per visit, down to none once warm.
 
 = 0.14.0 =
 * Fix: Graph view never showed a single shared component on an Etch site. It
