@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.1
+Stable tag: 0.16.2
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,20 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.2 =
+* Change: Template Board card thumbnails are now a 4:3 box instead of a
+  fixed 84px-tall strip that cropped almost the entire captured page down
+  to a thin sliver. Captures are full-page-height screenshots at a fixed
+  width, so the box still can't show everything — the crop now anchors to
+  the top of the page (its header/hero) instead of an arbitrary centered
+  strip, which is the part that actually identifies a template at a glance.
+* Fix: the thumbnail's bottom corners were square where the top corners
+  were rounded. The card's own rounded-corner clip only reaches the thumb's
+  top edge, since that's the only part touching the card's actual boundary
+  — the bottom of the thumb is an internal seam against the footer below,
+  which nothing had rounded. The thumb now rounds its own corners directly
+  so all four stay consistent regardless of where the footer sits.
 
 = 0.16.1 =
 * Fix: a Template Board column with more cards than fit its visible height
