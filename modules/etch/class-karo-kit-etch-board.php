@@ -734,7 +734,18 @@ final class Karo_Kit_Etch_Board {
 		self::setup_preview_context( (string) $slug );
 		status_header( 200 );
 
-		$content = $template->content ?? '';
+		// Render the blocks BEFORE the head, for the reason core's own
+		// template-canvas.php gives where it does exactly the same thing:
+		// "This needs to run before <head> so that blocks can add scripts and
+		// styles in wp_head()." Etch is a case in point — it accumulates the
+		// CSS for each element as that element renders, then prints the lot on
+		// wp_head at priority 99. Rendering into the body after wp_head meant
+		// that hook fired with nothing collected yet, so all it emitted were
+		// the handful of always-on :root rules (~3 KB of the ~40 KB a real
+		// page gets) and every class-based layout rule was missing — which is
+		// why captures came out as a bare left-aligned stack.
+		$template_html = self::render_template_html( (string) ( $template->content ?? '' ) );
+
 		echo '<!doctype html>';
 		echo '<html ' . get_language_attributes() . '>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<head><meta charset="' . esc_attr( get_bloginfo( 'charset' ) ) . '">';
@@ -748,10 +759,35 @@ final class Karo_Kit_Etch_Board {
 		// Nothing errors when they're missing — it just quietly renders wrong,
 		// which is why it went unnoticed until someone looked at a thumbnail.
 		echo '<body ' . self::body_class_attr( 'karo-kit-etch-preview' ) . '>'; // phpcs:ignore WordPress.Security.EscapeOutput
-		echo do_blocks( $content ); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo $template_html; // phpcs:ignore WordPress.Security.EscapeOutput
 		wp_footer();
 		echo '</body></html>';
 		exit;
+	}
+
+	/**
+	 * Run a template's block markup through the same pipeline core applies in
+	 * get_the_block_template_html(), including the .wp-site-blocks wrapper
+	 * themes hang descendant styles off (`.wp-site-blocks > *`). Core's
+	 * skip-link is deliberately left out: it exists for keyboard navigation
+	 * on a real page and would only add markup to a thumbnail.
+	 */
+	private static function render_template_html( string $content ): string {
+		global $wp_embed;
+
+		if ( $wp_embed instanceof WP_Embed ) {
+			$content = $wp_embed->run_shortcode( $content );
+			$content = $wp_embed->autoembed( $content );
+		}
+		$content = shortcode_unautop( $content );
+		$content = do_shortcode( $content );
+		$content = do_blocks( $content );
+		$content = wptexturize( $content );
+		$content = convert_smilies( $content );
+		$content = wp_filter_content_tags( $content, 'template' );
+		$content = str_replace( ']]>', ']]&gt;', $content );
+
+		return '<div class="wp-site-blocks">' . $content . '</div>';
 	}
 
 	/** WordPress's own get_body_class(), pre-joined into a class="" attribute. */

@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.6
+Stable tag: 0.16.7
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,27 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.7 =
+* Fix: Template Board thumbnails captured the page almost completely
+  unstyled — everything left-aligned in a bare vertical stack, with the
+  nav flattened into a list of every link including submenu items that
+  should have stayed collapsed. The capture route rendered the template's
+  blocks into the body *after* `wp_head()` had already run. Etch builds its
+  per-page CSS from the elements it sees as they render and prints the
+  result on `wp_head` at priority 99, so that hook fired before a single
+  block had rendered: it emitted only the always-on `:root` rules — about
+  3 KB against the ~40 KB the same template produces on the front end — and
+  every class-based layout rule was simply absent. Blocks are now rendered
+  ahead of the head, which is what WordPress core's own template-canvas.php
+  does, for the reason its comment states: "This needs to run before <head>
+  so that blocks can add scripts and styles in wp_head()." The captured
+  page now matches the real one.
+* Fix: the capture route skipped the content filters and the
+  `.wp-site-blocks` wrapper that core applies around a block template, so
+  shortcodes and embeds in a template went unprocessed and any theme rule
+  written as a descendant of that wrapper (`.wp-site-blocks > *`, which is
+  what core added it for) never applied.
 
 = 0.16.6 =
 * Fix: every Template Board thumbnail captured an empty page body, so they
