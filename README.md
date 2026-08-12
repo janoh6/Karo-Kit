@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.15.0
+Stable tag: 0.15.1
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,22 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.15.1 =
+* Security: the Registration toggle only ever gated Karo Kit's own front-end
+  form. WordPress's native wp-login.php?action=register runs on a separate
+  core check, "Anyone can register", that this toggle never touched — and the
+  native screen is only routed to your own page once both a login page and a
+  registration page are chosen in Gate settings. Short of that, turning
+  registration off here did not reliably close it: the native screen stayed
+  open, governed purely by core's setting. Verified against a real site: the
+  exact gap (toggle off, core's setting on, no login page configured) used to
+  render the native form; it now redirects to `?registration=disabled`. Never
+  forces registration open the other way — core's own setting still decides
+  that on its own.
+* Change: "Register page" is now "Registration page" throughout — the
+  dashboard's Site Access card, the Gate settings field, and Settings
+  Transfer's labels.
 
 = 0.15.0 =
 * Change: Template Board thumbnails are now captured in your own browser
