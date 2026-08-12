@@ -137,32 +137,100 @@
 		if (!thumbBusy) { processThumbQueue(); }
 	}
 
+	var CAPTURE_WIDTH = 1280;
+	var CAPTURE_TIMEOUT = 20000;
+
+	/**
+	 * Render one template off-screen and rasterise it here in the browser.
+	 *
+	 * Thumbnails used to come from WordPress.com's mShots: the server asked an
+	 * outside service to screenshot the site, which meant template markup left
+	 * the site and the preview route had to be reachable by a stranger. This
+	 * loads the same preview into a hidden iframe using the session already
+	 * signed in to the builder, so nothing about the page goes anywhere.
+	 *
+	 * The library runs inside the iframe rather than reaching across from here,
+	 * so it reads styles from the document that actually owns them.
+	 */
+	function captureTemplate(slug) {
+		return fetchJSON('/preview-url?slug=' + encodeURIComponent(slug)).then(function (res) {
+			if (!res || !res.url) { throw new Error('no preview URL'); }
+			return new Promise(function (resolve, reject) {
+				var frame = document.createElement('iframe');
+				frame.setAttribute('aria-hidden', 'true');
+				frame.style.cssText = 'position:fixed;left:-10000px;top:0;border:0;visibility:hidden;' +
+					'width:' + CAPTURE_WIDTH + 'px;height:900px;';
+				var done = false;
+				var timer = setTimeout(function () { finish(new Error('capture timed out')); }, CAPTURE_TIMEOUT);
+
+				function finish(err, dataUrl) {
+					if (done) { return; }
+					done = true;
+					clearTimeout(timer);
+					if (frame.parentNode) { frame.parentNode.removeChild(frame); }
+					if (err) { reject(err); } else { resolve(dataUrl); }
+				}
+
+				frame.addEventListener('load', function () {
+					var win = frame.contentWindow;
+					var doc = frame.contentDocument;
+					if (!win || !doc || !doc.body) { finish(new Error('preview did not load')); return; }
+
+					// Grow to the full document so the capture isn't clipped to
+					// the viewport, then let layout settle before reading.
+					try { frame.style.height = Math.max(900, doc.documentElement.scrollHeight) + 'px'; } catch (e) { /* ignore */ }
+
+					var run = function () {
+						var snap = win.snapdom || window.snapdom;
+						if (!snap) { finish(new Error('snapdom unavailable')); return; }
+						snap.toPng(doc.body, {
+							width: doc.documentElement.scrollWidth,
+							height: doc.documentElement.scrollHeight,
+							backgroundColor: '#ffffff', // the page's own backdrop isn't part of the DOM
+							// Cross-origin images can't be read back off a canvas,
+							// so they route through our own origin or come out blank.
+							useProxy: res.proxy || '',
+						}).then(function (img) {
+							finish(null, img.src);
+						}).catch(function (e) { finish(e); });
+					};
+
+					// Give webfonts a chance; captures otherwise fall back to a
+					// system face and re-wrap.
+					var ready = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
+					ready.then(function () { setTimeout(run, 250); }, function () { setTimeout(run, 250); });
+				});
+
+				frame.addEventListener('error', function () { finish(new Error('preview failed to load')); });
+				frame.src = res.url;
+				document.body.appendChild(frame);
+			});
+		});
+	}
+
 	function processThumbQueue() {
 		if (!thumbQueue.length) { thumbBusy = false; return; }
 		thumbBusy = true;
 		var job = thumbQueue.shift();
-		fetchJSON('/thumbnail', { method: 'POST', body: JSON.stringify({ slug: job.slug }) })
+		captureTemplate(job.slug)
+			.then(function (dataUrl) {
+				return fetchJSON('/thumbnail', {
+					method: 'POST',
+					body: JSON.stringify({ slug: job.slug, image: dataUrl }),
+				});
+			})
 			.then(function (res) {
 				if (res && res.thumbUrl) {
 					applyThumb(job.thumbEl, res.thumbUrl, job.slug);
-					delete thumbInFlight[job.slug];
-				} else if (res && res.pending && job.attempts < 8) {
-					// mShots is still generating — retry this slug shortly.
-					job.attempts += 1;
-					setTimeout(function () {
-						thumbQueue.push(job);
-						if (!thumbBusy) { processThumbQueue(); }
-					}, 4000);
 				} else {
 					job.thumbEl.classList.remove('is-generating');
-					if (res && res.pending) { console.warn('ETB thumbnail: still generating after retries for "' + job.slug + '" (is the site publicly reachable?)'); }
-					else if (res && res.message) { console.warn('ETB thumbnail:', res.message); }
-					delete thumbInFlight[job.slug];
+					if (res && res.message) { console.warn('ETB thumbnail:', res.message); }
 				}
+				delete thumbInFlight[job.slug];
 			})
 			.catch(function (e) {
 				job.thumbEl.classList.remove('is-generating');
-				console.warn('ETB thumbnail failed', e);
+				console.warn('ETB thumbnail failed for "' + job.slug + '":', e && e.message ? e.message : e);
 				delete thumbInFlight[job.slug];
 			})
 			.then(function () { processThumbQueue(); });

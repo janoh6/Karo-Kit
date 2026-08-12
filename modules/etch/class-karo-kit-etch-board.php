@@ -136,6 +136,7 @@ final class Karo_Kit_Etch_Board {
 			return null;
 		}
 
+		$nonce = wp_create_nonce( 'wp_rest' );
 
 		return array(
 			'styles'  => array( Karo_Kit_Etch::asset_url( 'assets/etch/board.css' ) ),
@@ -143,11 +144,12 @@ final class Karo_Kit_Etch_Board {
 				'name'  => 'KaroKitEtchData',
 				'value' => array(
 					'restBase' => esc_url_raw( rest_url( self::REST_NAMESPACE . '/etch' ) ),
-					'nonce'    => wp_create_nonce( 'wp_rest' ),
+					'nonce'    => $nonce,
 				),
 			),
 			// Bridge first (exposes the bridge global), then the board that consumes it.
 			'scripts' => array(
+				Karo_Kit_Etch::asset_url( 'assets/etch/vendor/snapdom.min.js' ),
 				Karo_Kit_Etch::asset_url( 'assets/etch/bridge.js' ),
 				Karo_Kit_Etch::asset_url( 'assets/etch/board.js' ),
 			),
@@ -176,7 +178,35 @@ final class Karo_Kit_Etch_Board {
 			'callback'            => array( __CLASS__, 'make_thumbnail' ),
 			'permission_callback' => array( __CLASS__, 'can_edit' ),
 			'args'                => array(
+				'slug'  => array( 'required' => true, 'type' => 'string' ),
+				'image' => array( 'required' => true, 'type' => 'string' ),
+			),
+		) );
+
+		// Minted on demand rather than handed out with the template list: a
+		// token only lives ~60s, so one issued at page load would be stale long
+		// before anyone captured anything.
+		register_rest_route( $ns, '/etch/preview-url', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'get_preview_url' ),
+			'permission_callback' => array( __CLASS__, 'can_edit' ),
+			'args'                => array(
 				'slug' => array( 'required' => true, 'type' => 'string' ),
+			),
+		) );
+
+		// Guarded by a minted token rather than the usual capability check: the
+		// capture library issues this request itself, and decides whether to
+		// send credentials from the *original* image's origin — so for the
+		// cross-origin images this exists to serve, it strips cookies even
+		// though the proxy is same-origin. Cookie auth therefore can't apply.
+		register_rest_route( $ns, '/etch/image-proxy', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'proxy_image' ),
+			'permission_callback' => array( __CLASS__, 'check_proxy_token' ),
+			'args'                => array(
+				'url'   => array( 'required' => true, 'type' => 'string' ),
+				'token' => array( 'required' => true, 'type' => 'string' ),
 			),
 		) );
 
@@ -619,29 +649,27 @@ final class Karo_Kit_Etch_Board {
 		return rest_ensure_response( array( 'saved' => true, 'order' => $order ) );
 	}
 
-	/* ---- Standalone template preview (screenshot target) ----------------- */
+	/* ---- Standalone template preview (capture target) -------------------- */
 
 	/** How long a minted preview link stays valid before it 404s outright. */
 	const PREVIEW_TOKEN_TTL = 60;
 
+	/** Transient prefix for image-proxy tokens, issued with each preview URL. */
+	const PROXY_TOKEN_PREFIX = 'karo_kit_etch_proxy_';
+
 	/**
 	 * Time-boxed URL that renders a template standalone.
 	 *
-	 * Must be publicly reachable — the screenshot service fetches it with no
-	 * WordPress auth of its own — so this used to key the route on the template
-	 * slug directly: permanent and guessable (`index`, `single`, `404`...),
-	 * meaning anyone who found or guessed it could browse every template on an
-	 * unlaunched or NDA'd site indefinitely. The route now takes a random token
-	 * minted per call, valid for PREVIEW_TOKEN_TTL seconds, so knowing the URL
-	 * is worth nothing outside the narrow window a real thumbnail request is
-	 * actually in flight.
+	 * This route was once keyed on the template slug directly — permanent and
+	 * guessable (`index`, `single`, `404`...) — and had to be public so an
+	 * outside screenshot service could fetch it, which together meant anyone
+	 * who guessed a slug could browse every template on an unlaunched or NDA'd
+	 * site indefinitely. Captures now happen in the admin's own browser, so the
+	 * route requires a capability; the token adds a second gate, scoping a link
+	 * to one template for PREVIEW_TOKEN_TTL seconds.
 	 *
-	 * Deliberately not single-use: generate_thumbnail() fetches this exact URL
-	 * twice — once to verify it renders before spending a call on the remote
-	 * service, then again as the URL handed to that service — so the token has
-	 * to survive more than one read. The TTL alone already closes the real
-	 * problem; a 32-character random value is not a thing worth guessing at,
-	 * 60-second window or not.
+	 * Not single-use: the capture may read it more than once (the iframe load
+	 * plus any retry), and the TTL is what actually bounds exposure.
 	 */
 	private static function preview_url( $slug ): string {
 		$token = wp_generate_password( 32, false, false );
@@ -650,9 +678,13 @@ final class Karo_Kit_Etch_Board {
 	}
 
 	/**
-	 * Render a template standalone at /?karo_kit_etch_preview={token}. Must be
-	 * public so the screenshot service can reach it; the token is what limits
-	 * that to a real, in-flight thumbnail request rather than standing access.
+	 * Render a template standalone at /?karo_kit_etch_preview={token}.
+	 *
+	 * Requires the same capability as the rest of the board. This route existed
+	 * only because an outside screenshot service had to fetch it with no login
+	 * of its own, which forced it to be public; thumbnails are now captured in
+	 * the admin's own browser, so the one reason to leave it open is gone. The
+	 * short-lived token stays as a second gate on top.
 	 */
 	public static function maybe_render_preview(): void {
 		$token = sanitize_text_field( (string) get_query_var( 'karo_kit_etch_preview' ) );
@@ -661,6 +693,18 @@ final class Karo_Kit_Etch_Board {
 		}
 
 		header( 'X-Robots-Tag: noindex, nofollow', true );
+
+		if ( ! self::can_edit() ) {
+			status_header( 404 );
+			echo 'Template not found';
+			exit;
+		}
+
+		// The capture now runs as a signed-in administrator, so the admin bar
+		// would render into the thumbnail and push the whole page down by its
+		// own height. The old remote screenshotter was a logged-out stranger and
+		// never saw it.
+		add_filter( 'show_admin_bar', '__return_false' );
 
 		$slug     = get_transient( 'karo_kit_etch_preview_' . $token );
 		$template = $slug ? self::find_template( (string) $slug ) : null;
@@ -725,16 +769,45 @@ final class Karo_Kit_Etch_Board {
 
 	/* ---- Thumbnails ------------------------------------------------------ */
 
-	/** On-demand generation for one template, called by the board for missing/stale thumbs. */
+	/** Largest capture accepted, before resizing. Generous for a 1280px page. */
+	const MAX_CAPTURE_BYTES = 12582912; // 12 MB
+
+	/**
+	 * Store a thumbnail captured by the board.
+	 *
+	 * The image arrives as a data URL produced in the browser: the board renders
+	 * the template in a hidden iframe and rasterises it there. Previously this
+	 * endpoint took only a slug and asked WordPress.com's mShots service to
+	 * screenshot the site from outside, which meant template markup left the
+	 * site altogether and the preview route had to be publicly reachable for a
+	 * stranger's browser to fetch. Capturing in the admin's own already-
+	 * authenticated browser removes both of those.
+	 */
 	public static function make_thumbnail( $request ) {
 		$slug = sanitize_title( (string) $request->get_param( 'slug' ) );
 		if ( '' === $slug ) {
 			return new WP_Error( 'karo_kit_etch_bad_slug', 'Missing slug', array( 'status' => 400 ) );
 		}
-		$result = self::generate_thumbnail( $slug );
-		if ( is_array( $result ) && ! empty( $result['pending'] ) ) {
-			return rest_ensure_response( array( 'pending' => true ) );
+
+		$data_url = (string) $request->get_param( 'image' );
+		if ( ! preg_match( '#^data:image/png;base64,#', $data_url ) ) {
+			return new WP_Error( 'karo_kit_etch_bad_image', 'Expected a PNG data URL', array( 'status' => 400 ) );
 		}
+
+		$raw = base64_decode( substr( $data_url, strlen( 'data:image/png;base64,' ) ), true );
+		if ( false === $raw || '' === $raw ) {
+			return new WP_Error( 'karo_kit_etch_bad_image', 'Could not decode image', array( 'status' => 400 ) );
+		}
+		if ( strlen( $raw ) > self::MAX_CAPTURE_BYTES ) {
+			return new WP_Error( 'karo_kit_etch_image_too_big', 'Capture exceeds the size limit', array( 'status' => 413 ) );
+		}
+		// Trust the bytes, not the declared type: the data URL prefix is just a
+		// string the client chose.
+		if ( "\x89PNG\r\n\x1a\n" !== substr( $raw, 0, 8 ) ) {
+			return new WP_Error( 'karo_kit_etch_bad_image', 'Payload is not a PNG', array( 'status' => 400 ) );
+		}
+
+		$result = self::store_capture( $slug, $raw );
 		if ( is_wp_error( $result ) ) {
 			return new WP_Error( 'karo_kit_etch_thumb_failed', $result->get_error_message(), array( 'status' => 500 ) );
 		}
@@ -744,6 +817,82 @@ final class Karo_Kit_Etch_Board {
 		update_option( self::THUMB_OPT, $opt, false );
 
 		return rest_ensure_response( array( 'thumbUrl' => self::thumb_url_for( $slug ) ) );
+	}
+
+	/**
+	 * A fresh, short-lived preview URL for one template, plus the image-proxy
+	 * prefix the capture should use. Both expire together.
+	 */
+	public static function get_preview_url( $request ) {
+		$slug = sanitize_title( (string) $request->get_param( 'slug' ) );
+		if ( '' === $slug || ! self::find_template( $slug ) ) {
+			return new WP_Error( 'karo_kit_etch_bad_slug', 'Unknown template', array( 'status' => 404 ) );
+		}
+
+		$token = wp_generate_password( 32, false, false );
+		set_transient( self::PROXY_TOKEN_PREFIX . $token, 1, self::PREVIEW_TOKEN_TTL );
+
+		return rest_ensure_response( array(
+			'url' => self::preview_url( $slug ),
+			// Trailing separator: the capture library appends `url=<encoded>`.
+			'proxy' => add_query_arg(
+				array( 'token' => $token ),
+				rest_url( self::REST_NAMESPACE . '/etch/image-proxy' )
+			) . '&',
+		) );
+	}
+
+	/** Does this request carry a live proxy token? */
+	public static function check_proxy_token( $request ): bool {
+		$token = sanitize_text_field( (string) $request->get_param( 'token' ) );
+		if ( '' === $token ) {
+			return false;
+		}
+		return (bool) get_transient( self::PROXY_TOKEN_PREFIX . $token );
+	}
+
+	/**
+	 * Fetch a cross-origin image server-side and re-serve it same-origin.
+	 *
+	 * The capture library reads pixels back out of a canvas, and the browser
+	 * refuses that for images from another origin unless that origin opts in
+	 * with CORS headers — which pattern-library and CDN hosts generally do not.
+	 * Those images would silently come out blank. Re-serving them from this
+	 * site's own origin makes them same-origin as far as the canvas is
+	 * concerned, so they capture normally.
+	 *
+	 * wp_safe_remote_get() is deliberate: it refuses private, loopback and
+	 * link-local addresses, so an authenticated caller can't turn this into a
+	 * probe of the host's internal network.
+	 */
+	public static function proxy_image( $request ) {
+		$url = esc_url_raw( (string) $request->get_param( 'url' ) );
+		if ( '' === $url || ! wp_http_validate_url( $url ) ) {
+			return new WP_Error( 'karo_kit_etch_bad_proxy_url', 'Invalid URL', array( 'status' => 400 ) );
+		}
+
+		$resp = wp_safe_remote_get( $url, array( 'timeout' => 10, 'redirection' => 2 ) );
+		if ( is_wp_error( $resp ) ) {
+			return new WP_Error( 'karo_kit_etch_proxy_failed', $resp->get_error_message(), array( 'status' => 502 ) );
+		}
+		$code = (int) wp_remote_retrieve_response_code( $resp );
+		$type = (string) wp_remote_retrieve_header( $resp, 'content-type' );
+		$body = wp_remote_retrieve_body( $resp );
+
+		if ( 200 !== $code || 0 !== strpos( $type, 'image/' ) ) {
+			return new WP_Error( 'karo_kit_etch_proxy_not_image', 'Upstream did not return an image', array( 'status' => 502 ) );
+		}
+		if ( strlen( $body ) > self::MAX_CAPTURE_BYTES ) {
+			return new WP_Error( 'karo_kit_etch_proxy_too_big', 'Upstream image too large', array( 'status' => 502 ) );
+		}
+
+		// Streamed straight out rather than returned as REST JSON: the caller is
+		// an <img>/fetch inside the capture, which wants image bytes.
+		header( 'Content-Type: ' . sanitize_text_field( $type ) );
+		header( 'Cache-Control: private, max-age=300' );
+		header( 'X-Content-Type-Options: nosniff' );
+		echo $body; // phpcs:ignore WordPress.Security.EscapeOutput
+		exit;
 	}
 
 	private static function thumb_dir(): array {
@@ -801,80 +950,48 @@ final class Karo_Kit_Etch_Board {
 	}
 
 	/**
-	 * Fetch a screenshot from WordPress.com mShots and store a resized JPEG.
-	 * mShots generates asynchronously: while it is still working it redirects
-	 * or returns a small placeholder, so this returns array('pending'=>true)
-	 * and the board retries.
+	 * Write a captured PNG out as the slug's 16:9 JPEG thumbnail.
 	 *
-	 * Note: the target URL must be publicly reachable — mShots runs on
-	 * WordPress.com's servers and cannot see local or staging sites.
-	 *
-	 * @return string|array|WP_Error Saved file path, array('pending'=>true), or error.
+	 * @param string $slug Template slug.
+	 * @param string $png  Raw PNG bytes, already validated by the caller.
+	 * @return string|WP_Error Saved file path, or an error.
 	 */
-	private static function generate_thumbnail( $slug ) {
-		$url = self::preview_url( $slug );
-
-		/** Filter the source URL sent to the screenshot service. */
-		$url = apply_filters( 'karo_kit_etch_thumbnail_source_url', $url, $slug );
-
-		// Verify the preview URL actually returns 200 before spending an mShots
-		// call — otherwise mShots returns its "404" graphic and we would cache
-		// that as if it were a real screenshot. If the loopback check itself
-		// fails (some hosts block it), fall through and let mShots try anyway.
-		$check = wp_remote_get( $url, array( 'timeout' => 12, 'redirection' => 3 ) );
-		if ( ! is_wp_error( $check ) ) {
-			$ccode = (int) wp_remote_retrieve_response_code( $check );
-			if ( 200 !== $ccode ) {
-				self::delete_thumb( $slug ); // drop any previously-cached bad image
-				return new WP_Error(
-					'karo_kit_etch_preview_status',
-					'Preview returned HTTP ' . $ccode . ' for ' . esc_html( $url ) . ' — not screenshotting.'
-				);
-			}
-		}
-
-		$mshots = 'https://s0.wp.com/mshots/v1/' . rawurlencode( $url ) . '?w=1280&h=720';
-
-		$resp = wp_remote_get( $mshots, array(
-			'timeout'     => 20,
-			'redirection' => 0, // a redirect means "still generating"
-		) );
-		if ( is_wp_error( $resp ) ) {
-			return new WP_Error( 'karo_kit_etch_mshots_http', 'mShots request failed: ' . $resp->get_error_message() );
-		}
-
-		$code  = (int) wp_remote_retrieve_response_code( $resp );
-		$body  = wp_remote_retrieve_body( $resp );
-		$ctype = (string) wp_remote_retrieve_header( $resp, 'content-type' );
-
-		// Still generating: redirect, non-image, or a tiny placeholder image.
-		if ( $code >= 300 && $code < 400 ) {
-			return array( 'pending' => true );
-		}
-		if ( 200 !== $code || false === strpos( $ctype, 'image' ) || strlen( $body ) < 10000 ) {
-			return array( 'pending' => true );
-		}
-
+	private static function store_capture( string $slug, string $png ) {
 		$dir = self::thumb_dir();
-		wp_mkdir_p( $dir['path'] );
-		$raw   = trailingslashit( $dir['path'] ) . $slug . '-raw.img';
+		if ( ! wp_mkdir_p( $dir['path'] ) ) {
+			return new WP_Error( 'karo_kit_etch_mkdir_failed', 'Could not create ' . esc_html( $dir['path'] ) );
+		}
+
+		$raw   = trailingslashit( $dir['path'] ) . $slug . '-raw.png';
 		$final = trailingslashit( $dir['path'] ) . $slug . '.jpg';
 
-		if ( false === file_put_contents( $raw, $body ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		if ( false === file_put_contents( $raw, $png ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 			return new WP_Error( 'karo_kit_etch_write_failed', 'Could not write thumbnail to ' . esc_html( $dir['path'] ) );
 		}
 
-		// Normalise/crop to a 16:9 JPEG; if the body was not a valid image,
-		// treat it as a placeholder and keep retrying.
 		$editor = wp_get_image_editor( $raw );
 		if ( is_wp_error( $editor ) ) {
 			wp_delete_file( $raw );
-			return array( 'pending' => true );
+			return new WP_Error( 'karo_kit_etch_editor_failed', 'Capture was not a readable image' );
 		}
+
+		// A capture is the full page height, so crop to the top 16:9 band rather
+		// than squashing a very tall page into a card-shaped thumbnail.
+		$size = $editor->get_size();
+		$w    = (int) ( $size['width'] ?? 0 );
+		$h    = (int) ( $size['height'] ?? 0 );
+		if ( $w > 0 && $h > 0 ) {
+			$band = (int) round( $w * 9 / 16 );
+			if ( $h > $band ) {
+				$editor->crop( 0, 0, $w, $band );
+			}
+		}
+
 		$editor->resize( 640, 360, true );
 		$editor->set_quality( 82 );
 		$saved = $editor->save( $final, 'image/jpeg' );
 		wp_delete_file( $raw );
+
 		if ( is_wp_error( $saved ) || empty( $saved['path'] ) ) {
 			return new WP_Error( 'karo_kit_etch_save_failed', 'Could not save resized thumbnail' );
 		}

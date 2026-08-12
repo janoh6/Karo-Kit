@@ -8,7 +8,9 @@ wp-content/uploads/
 !.env.example
 
 # Dependencies
-vendor/
+# Anchored to the repo root: Composer's vendor/ belongs there, while bundled
+# front-end libraries (assets/etch/vendor/) are part of the plugin and must ship.
+/vendor/
 node_modules/
 
 # Build/cache

@@ -175,14 +175,8 @@ final class Karo_Kit_Etch_Settings {
 	public static function section_board_intro(): void {
 		echo '<p>' . esc_html__( 'Replaces Etch\'s Templates screen with a board: columns, drag-to-reorder, search, status badges and a component graph. Create, open and delete still run through Etch\'s own controls.', 'karo-kit' ) . '</p>';
 
-		// Thumbnails come from WordPress.com mShots, which cannot reach a site
-		// that isn't publicly resolvable — worth saying plainly rather than
-		// letting it look like a bug. Only relevant while the board is on.
-		if ( Karo_Kit_Etch_Board::enabled() && ! self::site_is_public() ) {
-			echo '<p class="kk-notice kk-notice--warn">'
-				. esc_html__( 'Thumbnails are captured by WordPress.com mShots, which cannot reach this site — it is local or otherwise not publicly resolvable. Everything else on the board works; cards simply show no preview image.', 'karo-kit' )
-				. '</p>';
-		}
+		// Thumbnails are captured in your own browser, so a local or otherwise
+		// unreachable site is no longer a problem worth warning about.
 	}
 
 	public static function field_board_on(): void {
@@ -291,19 +285,6 @@ final class Karo_Kit_Etch_Settings {
 			1
 		);
 		echo '<p class="description">' . esc_html__( 'Off means the builder always opens with both panels showing, and the tabs back at their default position.', 'karo-kit' ) . '</p>';
-	}
-
-	/** Best-effort: does this host look publicly reachable? */
-	private static function site_is_public(): bool {
-		$host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
-		if ( '' === $host ) {
-			return false;
-		}
-		if ( 'localhost' === $host || false !== strpos( $host, '.local' ) || false !== strpos( $host, '.test' ) ) {
-			return false;
-		}
-		// Bare IPs and hosts with no dot aren't reachable names either.
-		return false !== strpos( $host, '.' ) && ! filter_var( $host, FILTER_VALIDATE_IP );
 	}
 
 	/**
