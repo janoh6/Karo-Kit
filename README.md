@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.15.1
+Stable tag: 0.16.0
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,31 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.0 =
+* Add: Karo Kit can now check GitHub Releases for updates from wp-admin.
+  Nothing polled GitHub before this, since the plugin isn't on wp.org — the
+  update checker (vendored Plugin Update Checker, MIT) is initialised
+  unconditionally rather than behind an admin-only hook, so WP-CLI and the
+  background update cron see it too, not just an admin looking at the
+  Plugins screen. The repo is currently private, which it can't reach
+  without a token; that's exposed as an opt-in `karo_kit_update_token`
+  filter rather than a token shipped in the plugin, since a shared secret
+  baked into every install isn't one you can rotate. Does nothing until
+  either that filter is set or the repo goes public.
+* Fix: downloading the plugin from GitHub used its auto-generated "Source
+  code" archive, which unpacks to a folder named after the repo
+  (`Karo-Kit-x.y.z`) rather than `karo-kit` — so a manual download-and-
+  reinstall created an unrelated second, deactivated copy instead of
+  offering to replace the existing one. Releases now ship an explicit zip
+  rooted at `karo-kit/`, containing only the runtime files, and it's what
+  the update checker above fetches too.
+* Fix: every page-picker select in Gate settings (Login/Registration/
+  Account/Lost-password) went effectively blank on hover or keyboard focus.
+  WordPress core sets `color: #1e1e1e` on `.wp-core-ui select:focus` and
+  `:hover`, at the same CSS specificity as this plugin's own rule and
+  loaded after it — so focusing or hovering any select silently reverted
+  its text to near-black against Karo Kit's near-black dark theme.
 
 = 0.15.1 =
 * Security: the Registration toggle only ever gated Karo Kit's own front-end
