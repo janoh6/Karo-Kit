@@ -30,13 +30,16 @@ final class Karo_Kit_Gate_Auth {
 			self::redirect_back( 'login', 'badnonce' );
 		}
 
-		// Rate limit: too many recent failures from this IP -> refuse.
-		if ( Karo_Kit_Gate_Security::is_locked( 'login' ) ) {
+		$login = sanitize_user( wp_unslash( $_POST['log'] ?? '' ) );
+
+		// Rate limit. Scoped to the account being tried as well as the address,
+		// so one attacker can't lock out everyone sharing an office connection.
+		if ( Karo_Kit_Gate_Security::is_locked( 'login', $login ) ) {
 			self::redirect_back( 'login', 'locked' );
 		}
 
 		$creds = array(
-			'user_login'    => sanitize_user( wp_unslash( $_POST['log'] ?? '' ) ),
+			'user_login'    => $login,
 			'user_password' => (string) ( $_POST['pwd'] ?? '' ),
 			'remember'      => ! empty( $_POST['rememberme'] ),
 		);
@@ -44,11 +47,11 @@ final class Karo_Kit_Gate_Auth {
 		$user = wp_signon( $creds, is_ssl() );
 
 		if ( is_wp_error( $user ) ) {
-			Karo_Kit_Gate_Security::register_failure( 'login' );
+			Karo_Kit_Gate_Security::register_failure( 'login', $login );
 			self::redirect_back( 'login', 'login_failed' );
 		}
 
-		Karo_Kit_Gate_Security::clear( 'login' );
+		Karo_Kit_Gate_Security::clear( 'login', $login );
 
 		$redirect = ! empty( $_POST['redirect_to'] )
 			? esc_url_raw( wp_unslash( $_POST['redirect_to'] ) )

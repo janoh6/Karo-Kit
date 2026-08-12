@@ -8,10 +8,18 @@
  * purge plugin. A rate limiter that silently forgets an active lockout is a
  * security control resting on a cache, so the authoritative record is a row.
  *
- * One row per (IP, context) holds the attempt counter, the window it started
- * in, and when the lockout expires — which also gives callers the attempt
- * number, so logging can record the first failure and the lockout rather than
- * every attempt in between.
+ * A row holds the attempt counter, the window it started in, and when the
+ * lockout expires — which also gives callers the attempt number, so logging can
+ * record the first failure and the lockout rather than every attempt in between.
+ *
+ * Rows are keyed by a hashed identity plus a context. Where the caller can name
+ * *who* was being attacked (a login naming an account), two counters run at
+ * once: a tight one per account-from-this-IP, and a looser IP-wide one. Keying
+ * on the IP alone punished everyone sharing an address — one attacker on an
+ * office network or behind CGNAT locked out every colleague. Keying on the
+ * account alone would be worse: an attacker could try five passwords against
+ * each of a thousand usernames and never trip anything. Both together bound
+ * each account and still blunt a spray.
  *
  * @package Karo_Kit\Gate
  */
@@ -26,6 +34,18 @@ final class Karo_Kit_Gate_Security {
 	const DB_VERSION = 1;
 
 	const DB_VERSION_OPTION = 'karo_kit_gate_throttle_db_version';
+
+	/**
+	 * How much more the IP-wide counter tolerates than the per-account one.
+	 * With the default of 5 attempts, one address gets 25 failures across all
+	 * accounts before it is shut out entirely — loose enough that a shared
+	 * office address survives a few people fumbling passwords, tight enough
+	 * that spraying a user list from one host still ends.
+	 */
+	const IP_WIDE_MULTIPLIER = 5;
+
+	/** Context suffix for the IP-wide companion counter. */
+	const IP_WIDE_SUFFIX = '_ip';
 
 	public static function init(): void {
 		// Activation alone isn't enough — in-place updates skip that hook.
@@ -55,8 +75,10 @@ final class Karo_Kit_Gate_Security {
 		$table   = self::table();
 		$collate = $wpdb->get_charset_collate();
 
-		// The IP is stored hashed: this table exists to count abuse, and it
-		// doesn't need to retain readable addresses to do that.
+		// The identity is stored as a salted hash: this table exists to count
+		// abuse, and it doesn't need to retain readable addresses to do that.
+		// Rows keyed on an older, unsalted digest simply stop matching after an
+		// upgrade — a throttle counter is ephemeral, and purge() clears them.
 		dbDelta(
 			"CREATE TABLE {$table} (
 				ip_hash char(32) NOT NULL,
@@ -118,14 +140,28 @@ final class Karo_Kit_Gate_Security {
 		return (string) apply_filters( 'karo_kit_gate_client_ip', $ip );
 	}
 
-	private static function ip_hash(): string {
-		return md5( self::client_ip() );
+	/**
+	 * Key for a throttle row.
+	 *
+	 * Salted via wp_hash() rather than a bare md5: the whole IPv4 space is four
+	 * billion values, so an unsalted digest of an address is reversible by
+	 * exhaustion in minutes and pseudonymises nothing. wp_hash() also returns 32
+	 * hex characters, so the existing column still fits.
+	 *
+	 * Passing an identity scopes the row to that account from this address;
+	 * omitting it gives the IP-wide row.
+	 */
+	private static function key_for( string $identity = '' ): string {
+		$ip = self::client_ip();
+		// Usernames are matched case-insensitively at login, so vary only the
+		// case and you would otherwise get a fresh allowance each time.
+		return wp_hash( '' === $identity ? $ip : $ip . '|' . strtolower( $identity ) );
 	}
 
 	/* ---- State ------------------------------------------------------------ */
 
-	/** @return object|null Row for this visitor + context. */
-	private static function row( string $context ) {
+	/** @return object|null Row for one key + context. */
+	private static function row( string $key, string $context ) {
 		global $wpdb;
 
 		$table = self::table();
@@ -133,7 +169,7 @@ final class Karo_Kit_Gate_Security {
 		return $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT attempts, window_start, locked_until FROM {$table} WHERE ip_hash = %s AND context = %s",
-				self::ip_hash(),
+				$key,
 				sanitize_key( $context )
 			)
 		);
@@ -143,30 +179,39 @@ final class Karo_Kit_Gate_Security {
 		return $datetime ? (int) strtotime( $datetime . ' UTC' ) : 0;
 	}
 
-	/** Is this IP currently locked out for the given context? */
-	public static function is_locked( string $context ): bool {
-		$row = self::row( $context );
-		if ( ! $row ) {
-			return false;
-		}
-		return self::to_time( $row->locked_until ) > time();
+	private static function row_locked( string $key, string $context ): bool {
+		$row = self::row( $key, $context );
+		return $row && self::to_time( $row->locked_until ) > time();
 	}
 
 	/**
-	 * Record one failed attempt; trip a lockout once the threshold is hit.
+	 * Is this visitor currently locked out?
 	 *
-	 * @return array{attempts:int,max:int,locked:bool} So callers can log the
-	 *         first failure and the lockout without logging everything between.
+	 * @param string $context  Handler name, e.g. 'login'.
+	 * @param string $identity Account being targeted, where the caller knows it.
+	 *                         Given one, the IP-wide counter is consulted too.
 	 */
-	public static function register_failure( string $context ): array {
+	public static function is_locked( string $context, string $identity = '' ): bool {
+		if ( self::row_locked( self::key_for( $identity ), $context ) ) {
+			return true;
+		}
+		return '' !== $identity
+			&& self::row_locked( self::key_for(), $context . self::IP_WIDE_SUFFIX );
+	}
+
+	/**
+	 * Add one to a single counter, tripping its lockout at the threshold.
+	 *
+	 * @return array{attempts:int,max:int,locked:bool}
+	 */
+	private static function bump( string $key, string $context, int $max ): array {
 		global $wpdb;
 
-		$max      = self::max_attempts();
 		$window   = self::window_minutes();
 		$cooldown = self::cooldown_minutes();
 		$now      = time();
 
-		$row      = self::row( $context );
+		$row      = self::row( $key, $context );
 		$existing = (int) ( $row->attempts ?? 0 );
 		$started  = self::to_time( $row->window_start ?? null );
 
@@ -178,7 +223,7 @@ final class Karo_Kit_Gate_Security {
 		$locked_until = $locked ? gmdate( 'Y-m-d H:i:s', $now + ( $cooldown * MINUTE_IN_SECONDS ) ) : null;
 
 		$data = array(
-			'ip_hash'      => self::ip_hash(),
+			'ip_hash'      => $key,
 			'context'      => sanitize_key( $context ),
 			'attempts'     => $locked ? 0 : $attempts, // counter resets behind the lock
 			'window_start' => $in_window ? gmdate( 'Y-m-d H:i:s', $started ) : gmdate( 'Y-m-d H:i:s', $now ),
@@ -201,14 +246,40 @@ final class Karo_Kit_Gate_Security {
 			$wpdb->insert( self::table(), $data );
 		}
 
-		self::log_failure( $context, $attempts, $max, $locked, $cooldown );
+		return array( 'attempts' => $attempts, 'max' => $max, 'locked' => $locked );
+	}
 
-		return array(
-			'attempts' => $attempts,
-			'max'      => $max,
-			'locked'   => $locked,
-			'cooldown' => $cooldown,
-		);
+	/**
+	 * Record one failed attempt; trip a lockout once the threshold is hit.
+	 *
+	 * With an identity, two counters move at once — this account from this
+	 * address, and this address across every account.
+	 *
+	 * @param string $context  Handler name, e.g. 'login'.
+	 * @param string $identity Account being targeted, where the caller knows it.
+	 * @return array{attempts:int,max:int,locked:bool,cooldown:int} So callers can
+	 *         log the first failure and the lockout, not everything between.
+	 */
+	public static function register_failure( string $context, string $identity = '' ): array {
+		$cooldown = self::cooldown_minutes();
+		$result   = self::bump( self::key_for( $identity ), $context, self::max_attempts() );
+
+		if ( '' !== $identity ) {
+			$wide = self::bump(
+				self::key_for(),
+				$context . self::IP_WIDE_SUFFIX,
+				self::max_attempts() * self::IP_WIDE_MULTIPLIER
+			);
+			// Report whichever bound was actually reached, so the log and the
+			// caller describe the lockout the visitor will run into.
+			if ( $wide['locked'] && ! $result['locked'] ) {
+				$result = $wide;
+			}
+		}
+
+		self::log_failure( $context, $result['attempts'], $result['max'], $result['locked'], $cooldown );
+
+		return $result + array( 'cooldown' => $cooldown );
 	}
 
 	/**
@@ -247,14 +318,20 @@ final class Karo_Kit_Gate_Security {
 		}
 	}
 
-	/** Clear counters/lock for a context (call on success). */
-	public static function clear( string $context ): void {
+	/**
+	 * Clear the counter for a context (call on success).
+	 *
+	 * Only the identity's own counter is cleared. The IP-wide one is left to
+	 * expire with its window: an attacker holding one valid account on the site
+	 * could otherwise wipe the spray counter at will simply by logging in.
+	 */
+	public static function clear( string $context, string $identity = '' ): void {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->delete(
 			self::table(),
-			array( 'ip_hash' => self::ip_hash(), 'context' => sanitize_key( $context ) )
+			array( 'ip_hash' => self::key_for( $identity ), 'context' => sanitize_key( $context ) )
 		);
 	}
 }

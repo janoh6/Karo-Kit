@@ -34,6 +34,9 @@ final class Karo_Kit_Etch_Board {
 	 */
 	const THUMB_DIR = 'etb-thumbnails';
 
+	/** Cached component index; rebuilt whenever a template or component is saved. */
+	const COMPONENTS_CACHE = 'karo_kit_etch_component_index';
+
 	const STATUSES = array( 'wip', 'review', 'ready', 'live' );
 
 	public static function init(): void {
@@ -63,6 +66,12 @@ final class Karo_Kit_Etch_Board {
 		// Clean up stored status/thumbnail on delete, so a recreated template
 		// with the same slug starts fresh instead of inheriting them.
 		add_action( 'before_delete_post', array( __CLASS__, 'on_template_delete' ) );
+
+		// Component usage is derived from template and component markup, so any
+		// edit to either invalidates it.
+		add_action( 'save_post_wp_template', array( __CLASS__, 'flush_component_index' ) );
+		add_action( 'save_post_wp_block', array( __CLASS__, 'flush_component_index' ) );
+		add_action( 'deleted_post', array( __CLASS__, 'flush_component_index_on_delete' ), 10, 2 );
 	}
 
 	/**
@@ -446,24 +455,93 @@ final class Karo_Kit_Etch_Board {
 
 	/* ---- Shared components ----------------------------------------------- */
 
+	/** Drop the cached component index. */
+	public static function flush_component_index(): void {
+		delete_transient( self::COMPONENTS_CACHE );
+	}
+
 	/**
-	 * Components referenced by one template, as a list of {id, label}.
+	 * Same, on delete — but only for the two post types the index is built
+	 * from. `deleted_post` fires for everything, and routine revision cleanup
+	 * would otherwise throw the cache away constantly.
 	 *
-	 * Detection covers WordPress' standard reusable-block/synced-pattern
-	 * mechanism (a `core/block` with a `ref` to a `wp_block` post). If Etch's
-	 * own component system uses a different underlying block, register its
-	 * block name via the 'karo_kit_etch_component_block_names' filter.
+	 * @param int          $post_id Deleted post ID.
+	 * @param WP_Post|null $post    The post, where WordPress passed one.
 	 */
+	public static function flush_component_index_on_delete( $post_id, $post = null ): void {
+		$type = $post instanceof WP_Post ? $post->post_type : get_post_type( $post_id );
+		if ( 'wp_template' === $type || 'wp_block' === $type ) {
+			self::flush_component_index();
+		}
+	}
+
+	/**
+	 * Everything the board knows about component usage, built in one pass.
+	 *
+	 * Both board endpoints need this, and each was parsing the same markup
+	 * separately — the templates route to list each template's composition, the
+	 * components route to aggregate usage — so every template's blocks were
+	 * parsed twice per board open, on top of every component's blocks. Parsing
+	 * is the expensive part (on a real build here, ~470 KB of markup through
+	 * parse_blocks() each time), and none of it changes until something is
+	 * saved, which is exactly when the transient is dropped.
+	 *
+	 * @return array{byTemplate:array<string,array>,components:array<string,array>}
+	 */
+	private static function component_index(): array {
+		$cached = get_transient( self::COMPONENTS_CACHE );
+		if ( is_array( $cached ) && isset( $cached['byTemplate'], $cached['components'] ) ) {
+			return $cached;
+		}
+
+		$by_template = array();
+		$components  = array();
+
+		$record = static function ( $key, $label, $bucket, $where ) use ( &$components ) {
+			if ( ! isset( $components[ $key ] ) ) {
+				$components[ $key ] = array( 'label' => $label, 'usedIn' => array(), 'usedInComponents' => array() );
+			}
+			// A component referenced twice in the same place is one usage, not two.
+			if ( ! in_array( $where, $components[ $key ][ $bucket ], true ) ) {
+				$components[ $key ][ $bucket ][] = $where;
+			}
+		};
+
+		foreach ( get_block_templates( array(), 'wp_template' ) as $t ) {
+			$list = array();
+			foreach ( self::extract_components( $t->content ?? '' ) as $id => $label ) {
+				$list[] = array( 'id' => (string) $id, 'label' => $label );
+				$record( (string) $id, $label, 'usedIn', $t->slug );
+			}
+			$by_template[ $t->slug ] = $list;
+		}
+
+		$posts = get_posts( array(
+			'post_type'        => 'wp_block',
+			'post_status'      => array( 'publish', 'draft', 'private' ),
+			'posts_per_page'   => -1,
+			'suppress_filters' => false,
+		) );
+
+		foreach ( $posts as $p ) {
+			foreach ( self::extract_components( $p->post_content ?? '' ) as $id => $label ) {
+				if ( (string) $id === (string) $p->ID ) {
+					continue; // a component can't count as nesting itself
+				}
+				$record( (string) $id, $label, 'usedInComponents', $p->post_title ? $p->post_title : ( 'Component #' . $p->ID ) );
+			}
+		}
+
+		$index = array( 'byTemplate' => $by_template, 'components' => $components );
+		set_transient( self::COMPONENTS_CACHE, $index, DAY_IN_SECONDS );
+
+		return $index;
+	}
+
+	/** Components referenced by one template, as a list of {id, label}. */
 	private static function components_list( $template ): array {
-		$content = $template->content ?? '';
-		if ( '' === trim( $content ) ) {
-			return array();
-		}
-		$out = array();
-		foreach ( self::extract_components( $content ) as $id => $label ) {
-			$out[] = array( 'id' => (string) $id, 'label' => $label );
-		}
-		return $out;
+		$index = self::component_index();
+		return $index['byTemplate'][ $template->slug ] ?? array();
 	}
 
 	/** @return array<string,string> component id => label, deduped. */
@@ -526,40 +604,8 @@ final class Karo_Kit_Etch_Board {
 	 * blast radius that template links alone would miss.
 	 */
 	public static function get_components() {
-		$agg   = array();
-		$posts = get_posts( array(
-			'post_type'        => 'wp_block',
-			'post_status'      => array( 'publish', 'draft', 'private' ),
-			'posts_per_page'   => -1,
-			'suppress_filters' => false,
-		) );
-
-		$record = static function ( $key, $label, $bucket, $where ) use ( &$agg ) {
-			if ( ! isset( $agg[ $key ] ) ) {
-				$agg[ $key ] = array( 'label' => $label, 'usedIn' => array(), 'usedInComponents' => array() );
-			}
-			// A component referenced twice in the same place is one usage, not two.
-			if ( ! in_array( $where, $agg[ $key ][ $bucket ], true ) ) {
-				$agg[ $key ][ $bucket ][] = $where;
-			}
-		};
-
-		foreach ( get_block_templates( array(), 'wp_template' ) as $t ) {
-			foreach ( self::extract_components( $t->content ?? '' ) as $id => $label ) {
-				$record( (string) $id, $label, 'usedIn', $t->slug );
-			}
-		}
-
-		foreach ( $posts as $p ) {
-			foreach ( self::extract_components( $p->post_content ?? '' ) as $id => $label ) {
-				if ( (string) $id === (string) $p->ID ) {
-					continue; // a component can't count as nesting itself
-				}
-				$record( (string) $id, $label, 'usedInComponents', $p->post_title ? $p->post_title : ( 'Component #' . $p->ID ) );
-			}
-		}
-
-		return rest_ensure_response( $agg );
+		$index = self::component_index();
+		return rest_ensure_response( $index['components'] );
 	}
 
 	/* ---- Column order ---------------------------------------------------- */

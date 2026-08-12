@@ -63,6 +63,9 @@ $wpdb->query( 'DROP TABLE IF EXISTS ' . $wpdb->prefix . 'karo_kit_throttle' );
 wp_clear_scheduled_hook( 'karo_kit_log_trim' );
 wp_clear_scheduled_hook( 'karo_kit_daily' );
 
+// Derived cache, rebuilt on demand — no data of its own to lose.
+delete_transient( 'karo_kit_etch_component_index' );
+
 // Per-user leftovers: the import review stash and the dashboard theme choice.
 foreach ( get_users( array( 'fields' => 'ID' ) ) as $karo_kit_user ) {
 	delete_transient( 'karo_kit_import_' . $karo_kit_user );
