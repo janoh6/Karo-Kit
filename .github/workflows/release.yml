@@ -55,6 +55,23 @@ jobs:
             exit 1
           fi
 
+      # GitHub's own auto-generated "Source code" archive unpacks to a folder
+      # named after the repo (Karo-Kit-x.y.z), not karo-kit — so installing it
+      # in WordPress creates a second, unrelated-looking plugin instead of
+      # updating the existing one, and it still carries this dev doc and the
+      # CI config. Building the zip explicitly, rooted at karo-kit/ and
+      # containing only what actually ships, fixes both: a manual
+      # download-and-upload round-trip now offers to replace the existing
+      # install, and it's what the in-admin update checker (see
+      # includes/class-karo-kit-updates.php) fetches instead of the source
+      # archive.
+      - name: Build plugin zip
+        run: |
+          mkdir -p build/karo-kit
+          cp -r assets includes languages modules build/karo-kit/
+          cp index.php karo-kit.php uninstall.php README.md build/karo-kit/
+          ( cd build && zip -rq ../karo-kit.zip karo-kit )
+
       - name: Create release
         env:
           TAG: ${{ steps.tag.outputs.name }}
@@ -63,4 +80,5 @@ jobs:
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file notes.md \
-            --verify-tag
+            --verify-tag \
+            karo-kit.zip

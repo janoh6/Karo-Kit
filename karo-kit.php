@@ -51,7 +51,11 @@ require_once KARO_KIT_DIR . 'includes/class-karo-kit-module.php';
 require_once KARO_KIT_DIR . 'includes/class-karo-kit-log.php';
 require_once KARO_KIT_DIR . 'includes/class-karo-kit-accent.php';
 require_once KARO_KIT_DIR . 'includes/class-karo-kit-transfer.php';
+require_once KARO_KIT_DIR . 'includes/class-karo-kit-updates.php';
 require_once KARO_KIT_DIR . 'includes/class-karo-kit.php';
+
+// Outside any hook, per the update checker's own guidance — see the class.
+Karo_Kit_Updates::init();
 
 /* ---- Module: Gate -------------------------------------------------------- */
 require_once KARO_KIT_DIR . 'modules/gate/enum-karo-kit-gate-mode.php';
