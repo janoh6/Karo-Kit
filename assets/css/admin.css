@@ -835,8 +835,19 @@ body.karo-kit-app .kk-app *::after {
 	width: 320px;
 }
 
+/* WP core ships `.wp-core-ui select:focus`/`:hover { color: #1e1e1e }` at the
+   same specificity as the base .kk-app select rule above, and its stylesheet
+   loads after ours — so on focus/hover the text color reverted to core's
+   near-black, unreadable against this dark theme's near-black background.
+   Restating it here wins on source order instead. Inputs don't have a
+   matching core :hover color rule, only select does. */
+.kk-app select:hover {
+	color: var( --kk-ink );
+}
+
 .kk-app input:focus,
 .kk-app select:focus {
+	color: var( --kk-ink );
 	border-color: var( --kk-accent );
 	outline: none;
 	box-shadow: 0 0 0 2px var( --kk-focus-ring );
