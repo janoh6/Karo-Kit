@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.5
+Stable tag: 0.16.6
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,23 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.6 =
+* Fix: every Template Board thumbnail captured an empty page body, so they
+  all came out looking identical — just the shared header and footer, with
+  nothing of the template itself between them. The capture route renders a
+  template's blocks directly, and `core/post-content` (which most templates
+  reduce to) takes its post from block context, which WordPress only fills
+  in when a real post is set up first. That only happened for `single-*`,
+  `single` and `page` slugs; everything else — including `index`, which in
+  this theme is nothing *but* a post-content block — rendered an empty
+  `<main>`. Any slug without one of those prefixes now falls back to the
+  site's front page, or failing that any published page or post.
+* Fix: the capture route emitted a bare `<body class="karo-kit-etch-preview">`
+  and never called `body_class()`, so none of the classes real front-end
+  pages carry (`home`, `wp-singular`, `wp-theme-*`, …) were present, and
+  anything a theme or ACSS styles off one of them rendered differently in
+  the thumbnail than on the actual page.
 
 = 0.16.5 =
 * Fix: `Fatal error: Uncaught Error: Class "Parsedown" not found` on the

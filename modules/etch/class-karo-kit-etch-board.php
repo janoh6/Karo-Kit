@@ -740,11 +740,23 @@ final class Karo_Kit_Etch_Board {
 		echo '<head><meta charset="' . esc_attr( get_bloginfo( 'charset' ) ) . '">';
 		echo '<meta name="viewport" content="width=1280, initial-scale=1">';
 		wp_head();
-		echo '</head><body class="karo-kit-etch-preview">';
+		// body_class() carries the theme/ACSS's own selectors (`home`,
+		// `wp-singular`, `page-template-default`, `wp-theme-*`, …) that real
+		// front-end pages get for free; this route rendered a bare
+		// class="karo-kit-etch-preview" instead, so anything keyed off one of
+		// them styled differently here than on the page being previewed.
+		// Nothing errors when they're missing — it just quietly renders wrong,
+		// which is why it went unnoticed until someone looked at a thumbnail.
+		echo '<body ' . self::body_class_attr( 'karo-kit-etch-preview' ) . '>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo do_blocks( $content ); // phpcs:ignore WordPress.Security.EscapeOutput
 		wp_footer();
 		echo '</body></html>';
 		exit;
+	}
+
+	/** WordPress's own get_body_class(), pre-joined into a class="" attribute. */
+	private static function body_class_attr( string $extra ): string {
+		return 'class="' . esc_attr( implode( ' ', get_body_class( $extra ) ) ) . '"';
 	}
 
 	private static function find_template( $slug ) {
@@ -763,6 +775,15 @@ final class Karo_Kit_Etch_Board {
 	/**
 	 * Give dynamic templates a representative context so post-content/title
 	 * blocks render something. Best-effort — enough for a thumbnail.
+	 *
+	 * core/post-content (what a template's main content usually boils down
+	 * to) reads its post from block context, not just the $post global —
+	 * and WordPress only seeds that context from $post if $post is actually
+	 * a WP_Post when render_block() runs. Every slug needs something set,
+	 * not only the single-prefixed/single/page ones: "index" here is itself
+	 * just a bare core/post-content block (see the theme's templates/index.html),
+	 * so leaving $post unset for it meant its whole main content silently
+	 * rendered as an empty <main>, identical across every capture.
 	 */
 	private static function setup_preview_context( $slug ): void {
 		$pt = null;
@@ -773,13 +794,33 @@ final class Karo_Kit_Etch_Board {
 		} elseif ( 'page' === $slug ) {
 			$pt = 'page';
 		}
-		if ( ! $pt ) {
-			return;
+
+		$representative = null;
+		if ( $pt ) {
+			$recent         = get_posts( array( 'post_type' => $pt, 'posts_per_page' => 1, 'post_status' => 'publish' ) );
+			$representative = $recent[0] ?? null;
+		} else {
+			// No slug-specific post type — fall back to whatever the site
+			// would actually show as its front page, so templates like
+			// "index" that are just a bare post-content block still have
+			// something real to render instead of coming up empty.
+			if ( 'page' === get_option( 'show_on_front' ) ) {
+				$front_id       = (int) get_option( 'page_on_front' );
+				$representative = $front_id ? get_post( $front_id ) : null;
+			}
+			if ( ! $representative ) {
+				$recent         = get_posts( array( 'post_type' => 'page', 'posts_per_page' => 1, 'post_status' => 'publish' ) );
+				$representative = $recent[0] ?? null;
+			}
+			if ( ! $representative ) {
+				$recent         = get_posts( array( 'post_type' => 'post', 'posts_per_page' => 1, 'post_status' => 'publish' ) );
+				$representative = $recent[0] ?? null;
+			}
 		}
-		$recent = get_posts( array( 'post_type' => $pt, 'posts_per_page' => 1, 'post_status' => 'publish' ) );
-		if ( ! empty( $recent ) ) {
+
+		if ( $representative ) {
 			global $post;
-			$post = $recent[0]; // phpcs:ignore WordPress.WP.GlobalVariablesOverride
+			$post = $representative; // phpcs:ignore WordPress.WP.GlobalVariablesOverride
 			setup_postdata( $post );
 		}
 	}
