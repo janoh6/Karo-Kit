@@ -1044,7 +1044,14 @@ final class Karo_Kit_Etch_Board {
 	}
 
 	/**
-	 * Write a captured PNG out as the slug's 16:9 JPEG thumbnail.
+	 * Write a captured PNG out as the slug's 4:3 JPEG thumbnail.
+	 *
+	 * 4:3 matches the card's own thumbnail box (see `.etb-card__thumb` in
+	 * assets/etch/board.css). It has to: the card fills that box with
+	 * `object-fit: cover`, so storing a different shape means the browser
+	 * crops the difference away. This used to write 16:9, which cover then
+	 * trimmed down the sides of — on top of the top-band crop below — leaving
+	 * a thin slice of the page rather than a view of it.
 	 *
 	 * @param string $slug Template slug.
 	 * @param string $png  Raw PNG bytes, already validated by the caller.
@@ -1069,19 +1076,19 @@ final class Karo_Kit_Etch_Board {
 			return new WP_Error( 'karo_kit_etch_editor_failed', 'Capture was not a readable image' );
 		}
 
-		// A capture is the full page height, so crop to the top 16:9 band rather
+		// A capture is the full page height, so crop to the top 4:3 band rather
 		// than squashing a very tall page into a card-shaped thumbnail.
 		$size = $editor->get_size();
 		$w    = (int) ( $size['width'] ?? 0 );
 		$h    = (int) ( $size['height'] ?? 0 );
 		if ( $w > 0 && $h > 0 ) {
-			$band = (int) round( $w * 9 / 16 );
+			$band = (int) round( $w * 3 / 4 );
 			if ( $h > $band ) {
 				$editor->crop( 0, 0, $w, $band );
 			}
 		}
 
-		$editor->resize( 640, 360, true );
+		$editor->resize( 640, 480, true );
 		$editor->set_quality( 82 );
 		$saved = $editor->save( $final, 'image/jpeg' );
 		wp_delete_file( $raw );

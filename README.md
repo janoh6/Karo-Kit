@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.7
+Stable tag: 0.16.8
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,16 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.8 =
+* Fix: Template Board thumbnails still came out as a narrow sliver of the
+  page. 0.16.2 gave the card's thumbnail box a 4:3 shape but left the
+  server writing the file at 16:9 (640×360), and the card fills that box
+  with `object-fit: cover` — so the browser cropped the sides off an image
+  the server had already cropped to a top 16:9 band, twice-trimming it down
+  to a strip. Captures are now stored at 4:3 (640×480), the same shape as
+  the box that displays them, so the stored image appears in full with
+  nothing cropped away.
 
 = 0.16.7 =
 * Fix: Template Board thumbnails captured the page almost completely
