@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.3
+Stable tag: 0.16.4
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,12 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.4 =
+* Change: the gap between cards inside a Template Board column now matches
+  the gap between columns themselves (`--etb-gap`), instead of a tighter
+  0.5rem that made cards feel more cramped together than the columns
+  holding them.
 
 = 0.16.3 =
 * Change: a Template Board column used to scroll its cards internally once

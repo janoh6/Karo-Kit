@@ -279,7 +279,7 @@
 .etb-column__list {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var( --etb-gap );
 	min-height: 3.75rem;
 	padding: 0.125rem 0.75rem 0.875rem 0.75rem;
 }
