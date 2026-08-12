@@ -17,7 +17,7 @@ final class Karo_Kit_Gate extends Karo_Kit_Module {
 	 */
 	const PAGE_OPTIONS = array(
 		'login_page'    => 'Login page',
-		'register_page' => 'Register page',
+		'register_page' => 'Registration page',
 		'account_page'  => 'Account page (redirect after login)',
 		'lostpw_page'   => 'Lost-password page',
 	);
@@ -77,7 +77,7 @@ final class Karo_Kit_Gate extends Karo_Kit_Module {
 	public static function export_labels(): array {
 		return array(
 			'karo_kit_gate_login_page'        => __( 'Login page', 'karo-kit' ),
-			'karo_kit_gate_register_page'     => __( 'Register page', 'karo-kit' ),
+			'karo_kit_gate_register_page'     => __( 'Registration page', 'karo-kit' ),
 			'karo_kit_gate_account_page'      => __( 'Account page', 'karo-kit' ),
 			'karo_kit_gate_lostpw_page'       => __( 'Lost-password page', 'karo-kit' ),
 			'karo_kit_gate_maintenance_page'  => __( 'Maintenance page', 'karo-kit' ),

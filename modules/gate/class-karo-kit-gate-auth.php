@@ -18,6 +18,29 @@ final class Karo_Kit_Gate_Auth {
 		add_action( 'login_init', array( __CLASS__, 'redirect_wp_login' ) );
 		add_filter( 'login_url', array( __CLASS__, 'filter_login_url' ), 10, 3 );
 		add_filter( 'lostpassword_url', array( __CLASS__, 'filter_lostpassword_url' ), 10, 2 );
+		add_filter( 'option_users_can_register', array( __CLASS__, 'filter_users_can_register' ) );
+	}
+
+	/**
+	 * Make WordPress's own registration screen agree when this toggle says
+	 * closed. redirect_wp_login() only sends wp-login.php's ?action=register
+	 * to our own page when a login page *and* a register page are both
+	 * chosen; anywhere short of that, the native screen was still reachable
+	 * and governed only by core's "Anyone can register" — so turning this
+	 * option off did not reliably close registration site-wide.
+	 *
+	 * One-directional on purpose: this only forces the native check to
+	 * *false*, never to true. Whether core's own setting is on is this site's
+	 * own decision, independent of whether our form is enabled — a visitor
+	 * hitting the native screen while our form is on shouldn't get waved
+	 * through just because we're enabled.
+	 *
+	 * Filters the read only. Nothing is written to users_can_register, so
+	 * deactivating Karo Kit leaves the site's own original setting exactly as
+	 * it was, rather than depending on this filter having ever run.
+	 */
+	public static function filter_users_can_register( $value ) {
+		return get_option( 'karo_kit_gate_registration_on' ) ? $value : false;
 	}
 
 	/* ---- Login ----------------------------------------------------------- */
