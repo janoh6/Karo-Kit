@@ -3,7 +3,7 @@ Contributors: karo
 Tags: login, registration, maintenance, coming-soon, etch, acss
 Requires at least: 6.8
 Requires PHP: 8.4
-Stable tag: 0.16.4
+Stable tag: 0.16.5
 License: GPLv2 or later
 
 Modular site-utility kit for Etch / ACSS WordPress builds.
@@ -66,6 +66,19 @@ couldn't match, before anything is written.
 3. Configure via the "Karo Kit" item in the admin menu.
 
 == Changelog ==
+
+= 0.16.5 =
+* Fix: `Fatal error: Uncaught Error: Class "Parsedown" not found` on the
+  Plugins screen. The GitHub-Releases update checker added in 0.16.0
+  vendored Plugin Update Checker's `Puc/` classes but not its own `vendor/`
+  subfolder — Parsedown and PucReadmeParser, which `Vcs/Api.php` and
+  `Vcs/GitHubApi.php` load at runtime to render a release's Markdown body
+  into the changelog shown in wp-admin. That folder looked like the dev
+  tooling the rest of the trim was meant to drop, but it's a real runtime
+  dependency; since update checks return early with nothing to render until
+  a token is set or the repo is public, the gap stayed invisible until both
+  became true and a check finally reached an actual release. All three
+  files are vendored now.
 
 = 0.16.4 =
 * Change: the gap between cards inside a Template Board column now matches
