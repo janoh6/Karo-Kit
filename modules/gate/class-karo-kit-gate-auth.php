@@ -51,6 +51,7 @@ final class Karo_Kit_Gate_Auth {
 		}
 		if ( ! wp_verify_nonce( $_POST['karo_kit_login_nonce'], 'karo_kit_login' ) ) {
 			self::redirect_back( 'login', 'badnonce' );
+			return;
 		}
 
 		$login = sanitize_user( wp_unslash( $_POST['log'] ?? '' ) );
@@ -59,6 +60,7 @@ final class Karo_Kit_Gate_Auth {
 		// so one attacker can't lock out everyone sharing an office connection.
 		if ( Karo_Kit_Gate_Security::is_locked( 'login', $login ) ) {
 			self::redirect_back( 'login', 'locked' );
+			return;
 		}
 
 		$creds = array(
@@ -72,6 +74,7 @@ final class Karo_Kit_Gate_Auth {
 		if ( is_wp_error( $user ) ) {
 			Karo_Kit_Gate_Security::register_failure( 'login', $login );
 			self::redirect_back( 'login', 'login_failed' );
+			return;
 		}
 
 		Karo_Kit_Gate_Security::clear( 'login', $login );
@@ -92,23 +95,27 @@ final class Karo_Kit_Gate_Auth {
 		}
 		if ( ! wp_verify_nonce( $_POST['karo_kit_register_nonce'], 'karo_kit_register' ) ) {
 			self::redirect_back( 'register', 'badnonce' );
+			return;
 		}
 
 		// Registration must be enabled here — independent of the WordPress core
 		// "Anyone can register" setting.
 		if ( ! get_option( 'karo_kit_gate_registration_on' ) ) {
 			self::redirect_back( 'register', 'reg_closed' );
+			return;
 		}
 
 		// Rate limit.
 		if ( Karo_Kit_Gate_Security::is_locked( 'register' ) ) {
 			self::redirect_back( 'register', 'locked' );
+			return;
 		}
 
 		// Honeypot: real users leave this empty. A hit is a bot -> counts.
 		if ( ! empty( $_POST['karo_kit_hp'] ) ) {
 			Karo_Kit_Gate_Security::register_failure( 'register' );
 			self::redirect_back( 'register', 'reg_generic' );
+			return;
 		}
 
 		$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
@@ -120,12 +127,15 @@ final class Karo_Kit_Gate_Auth {
 		// user's typo shouldn't lock them out).
 		if ( ! is_email( $email ) ) {
 			self::redirect_back( 'register', 'reg_email_format' );
+			return;
 		}
 		if ( strlen( $user ) < 3 ) {
 			self::redirect_back( 'register', 'reg_user_short' );
+			return;
 		}
 		if ( strlen( $pass ) < 8 ) {
 			self::redirect_back( 'register', 'reg_pass' );
+			return;
 		}
 
 		// Existence collisions -> ONE generic message so an attacker can't tell
@@ -134,12 +144,14 @@ final class Karo_Kit_Gate_Auth {
 		if ( email_exists( $email ) || username_exists( $user ) ) {
 			Karo_Kit_Gate_Security::register_failure( 'register' );
 			self::redirect_back( 'register', 'reg_generic' );
+			return;
 		}
 
 		$user_id = wp_create_user( $user, $pass, $email );
 		if ( is_wp_error( $user_id ) ) {
 			Karo_Kit_Gate_Security::register_failure( 'register' );
 			self::redirect_back( 'register', 'reg_generic' );
+			return;
 		}
 
 		Karo_Kit_Gate_Security::clear( 'register' );
