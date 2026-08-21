@@ -207,46 +207,82 @@ final class Karo_Kit_Gate_Security {
 	private static function bump( string $key, string $context, int $max ): array {
 		global $wpdb;
 
+		$table    = self::table();
+		$context  = sanitize_key( $context );
 		$window   = self::window_minutes();
 		$cooldown = self::cooldown_minutes();
 		$now      = time();
 
-		$row      = self::row( $key, $context );
-		$existing = (int) ( $row->attempts ?? 0 );
-		$started  = self::to_time( $row->window_start ?? null );
+		$now_sql    = gmdate( 'Y-m-d H:i:s', $now );
+		$cutoff_sql = gmdate( 'Y-m-d H:i:s', $now - ( $window * MINUTE_IN_SECONDS ) );
 
-		// A stale window starts a fresh count rather than accumulating forever.
-		$in_window = $row && ( $now - $started ) < ( $window * MINUTE_IN_SECONDS );
-		$attempts  = $in_window ? $existing + 1 : 1;
-
-		$locked       = $attempts >= $max;
-		$locked_until = $locked ? gmdate( 'Y-m-d H:i:s', $now + ( $cooldown * MINUTE_IN_SECONDS ) ) : null;
-
-		$data = array(
-			'ip_hash'      => $key,
-			'context'      => sanitize_key( $context ),
-			'attempts'     => $locked ? 0 : $attempts, // counter resets behind the lock
-			'window_start' => $in_window ? gmdate( 'Y-m-d H:i:s', $started ) : gmdate( 'Y-m-d H:i:s', $now ),
-			'locked_until' => $locked_until,
+		/*
+		 * The counter is incremented by the database, never read into PHP and
+		 * written back: two concurrent failures used to read the same value and
+		 * write the same increment, so the counter advanced by one instead of
+		 * two and the lockout arrived later than configured.
+		 *
+		 * Assignment order is load-bearing. MySQL evaluates these left to right
+		 * and later assignments see earlier ones, so attempts must be computed
+		 * before window_start is reassigned — otherwise it compares against the
+		 * value being written rather than the one already stored.
+		 *
+		 * The comparison is against the cutoff, not now: it asks "is the
+		 * existing window still live?". Comparing against now would be false for
+		 * every row and reset the counter on every attempt, disabling rate
+		 * limiting while appearing to work.
+		 *
+		 * VALUES() would express this more briefly but is deprecated in MySQL
+		 * 8.0.20+ in favour of a row-alias syntax MariaDB does not share, so the
+		 * parameters are simply repeated.
+		 */
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$table} (ip_hash, context, attempts, window_start)
+				 VALUES (%s, %s, 1, %s)
+				 ON DUPLICATE KEY UPDATE
+				   attempts     = IF(window_start >= %s, attempts + 1, 1),
+				   window_start = IF(window_start >= %s, window_start, %s)",
+				$key,
+				$context,
+				$now_sql,
+				$cutoff_sql,
+				$cutoff_sql,
+				$now_sql
+			)
 		);
 
-		if ( $row ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->update(
-				self::table(),
-				array(
-					'attempts'     => $data['attempts'],
-					'window_start' => $data['window_start'],
-					'locked_until' => $data['locked_until'],
-				),
-				array( 'ip_hash' => $data['ip_hash'], 'context' => $data['context'] )
+		$row      = self::row( $key, $context );
+		$attempts = (int) ( $row->attempts ?? 1 );
+
+		/*
+		 * Trip the lock only if this request is the one that crossed the line.
+		 * The WHERE clause makes that conditional and rows_affected reports
+		 * whether we were first, so concurrent crossers log the lockout once
+		 * between them rather than once each.
+		 */
+		$locked = false;
+		if ( $attempts >= $max ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE {$table} SET locked_until = %s, attempts = 0
+					 WHERE ip_hash = %s AND context = %s AND attempts >= %d",
+					gmdate( 'Y-m-d H:i:s', $now + ( $cooldown * MINUTE_IN_SECONDS ) ),
+					$key,
+					$context,
+					$max
+				)
 			);
-		} else {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->insert( self::table(), $data );
+			$locked = 1 === (int) $wpdb->rows_affected;
 		}
 
-		return array( 'attempts' => $attempts, 'max' => $max, 'locked' => $locked );
+		return array(
+			'attempts' => $attempts,
+			'max'      => $max,
+			'locked'   => $locked,
+		);
 	}
 
 	/**
