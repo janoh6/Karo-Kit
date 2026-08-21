@@ -105,7 +105,7 @@ final class Registry {
 			'bool'  => 'boolean',
 			'int', 'page' => 'integer',
 			'array' => 'array',
-			default => 'string', // string, key, enum, hex
+			default => 'string', // string, key, slug, enum, hex
 		};
 	}
 
