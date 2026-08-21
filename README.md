@@ -67,6 +67,44 @@ couldn't match, before anything is written.
 
 == Changelog ==
 
+= 0.16.9 =
+* Security: the login rate limiter could undercount failed attempts.
+  Each failure read the counter, added one in PHP, and wrote it back, so
+  two attempts arriving together both read the same value and both wrote
+  the same increment — the counter advanced by one instead of two, and a
+  lockout configured for five attempts took longer than five to arrive.
+  The increment now happens inside the database, where it cannot be split
+  by a concurrent request. The lockout itself became a conditional write
+  that identifies which request crossed the threshold, so simultaneous
+  crossers record one lockout between them rather than one each.
+* Fix: registration could be closed without anyone choosing to close it.
+  The Gate's registration toggle was read with a check that cannot tell
+  "never set" from "set to off", so on a site that installed the kit and
+  never opened its settings, WordPress's own registration screen was shut
+  even though the site had deliberately enabled it. The toggle now has a
+  real stored value, seeded from the site's existing "Anyone can register"
+  setting. **If your site had WordPress registration enabled and Karo Kit
+  was silently closing it, this release restores it to open** — check
+  Gate → Site Access after updating if that is not what you want.
+* Fix: template dates on the Template Board could show the wrong day. The
+  date was read from the local-time column and parsed as though it were
+  UTC, so on any site not running at UTC it was shifted by the site's
+  offset — enough to land on the previous or next day.
+* Fix: importing settings reported everything as applied even when nothing
+  changed, including settings that store a list (Template Board column
+  order and statuses) where two different lists happened to have the same
+  number of entries. Both cases are now compared by their actual value,
+  not by the summary text used to display them, so only settings that
+  really changed are written and counted.
+* Internal: seeding the registration toggle on upgrade no longer writes
+  three unrelated entries into the activity log — that seeding step runs
+  once automatically and isn't something anyone chose, so it shouldn't
+  read back as if it were.
+* Internal: added a PHPUnit test suite covering the rate limiter, option
+  seeding, template dates and settings import, and a CI workflow to run
+  it. Test dependencies are development-only and are not part of the
+  released plugin.
+
 = 0.16.8 =
 * Fix: Template Board thumbnails still came out as a narrow sliver of the
   page. 0.16.2 gave the card's thumbnail box a 4:3 shape but left the
