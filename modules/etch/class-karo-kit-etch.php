@@ -20,6 +20,8 @@
  * @package Karo_Kit\Etch
  */
 
+use KaroKit\Core\Options\Option;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -55,15 +57,115 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 		return is_user_logged_in() && current_user_can( self::CAP );
 	}
 
-	/**
-	 * @return \KaroKit\Core\Options\Option[]
-	 *
-	 * Empty for now -- the real Gate option declarations move here in the
-	 * next task. Exists already so Task 7's registry-merging path has
-	 * something real to call while Karo_Kit::boot() is being wired.
-	 */
+	/** @return \KaroKit\Core\Options\Option[] */
 	public static function options(): array {
-		return array();
+		return array(
+			new Option(
+				name: Karo_Kit_Etch_Board::ENABLED_OPT,
+				type: 'bool',
+				default: true,
+				label: __( 'Template Board', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Board::THRESHOLD_OPT,
+				type: 'int',
+				default: 3,
+				label: __( 'Thumbnail refresh threshold', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Board::AUTO_LIMIT_OPT,
+				type: 'int',
+				default: 6,
+				// Newly exported -- was missing from the original
+				// export_map() while its sibling THRESHOLD_OPT was present.
+				// Approved as an incidental closure of a pre-existing
+				// omission, not a new feature (Deviation 5).
+				label: __( 'Auto-generate thumbnails', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Board::ORDER_OPT,
+				type: 'array',
+				default: array(),
+				label: __( 'Board column order', 'karo-kit' ),
+				setting: false, // internal state, written by the REST /etch/order handler
+				export: true,
+				autoload: false,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Board::THUMB_OPT,
+				type: 'array',
+				default: array(),
+				// Deliberately not exported -- thumbnails are generated
+				// files that regenerate on the target site.
+				setting: false,
+				autoload: false,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Board::STATUS_OPT,
+				type: 'array',
+				default: array(),
+				label: __( 'Template statuses', 'karo-kit' ),
+				setting: false, // internal state, written by the REST /etch/status handler
+				export: true,
+				autoload: false,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Structure::ENABLED_OPT,
+				type: 'bool',
+				default: true,
+				label: __( 'Structure arrows', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Structure::DWELL_OPT,
+				type: 'int',
+				default: 700,
+				label: __( 'Dwell delay', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Structure::PLACEMENT_OPT,
+				type: 'enum',
+				default: 'prepend',
+				label: __( 'Arrow position', 'karo-kit' ),
+				export: true,
+				enum: Karo_Kit_Etch_Structure::PLACEMENTS,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Structure::DISABLED_OPT,
+				type: 'bool',
+				default: false,
+				label: __( 'Show unavailable moves', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Sidebar::ENABLED_OPT,
+				type: 'bool',
+				default: true,
+				label: __( 'Sidebar tabs', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Etch_Sidebar::REMEMBER_OPT,
+				type: 'bool',
+				default: true,
+				label: __( 'Remember panel state', 'karo-kit' ),
+				export: true,
+			),
+			// One-time migration guard from the standalone Etch Template
+			// Board plugin. Never a setting, never exported; declared only
+			// so uninstall derives from the Registry rather than a
+			// hand-maintained list.
+			new Option(
+				name: 'karo_kit_etch_migrated',
+				type: 'bool',
+				default: false,
+				setting: false,
+			),
+		);
 	}
 
 	/**
@@ -145,44 +247,6 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 
 	public static function render_page(): void {
 		Karo_Kit_Etch_Settings::render_page();
-	}
-
-	/**
-	 * @inheritDoc
-	 *
-	 * Board column order and per-template statuses are keyed by template slug,
-	 * so they port cleanly. Thumbnails don't travel — they're generated files
-	 * that regenerate on the target site.
-	 */
-	public static function export_map(): array {
-		return array(
-			Karo_Kit_Etch_Board::ENABLED_OPT       => 'value',
-			Karo_Kit_Etch_Board::THRESHOLD_OPT     => 'value',
-			Karo_Kit_Etch_Board::ORDER_OPT         => 'value',
-			Karo_Kit_Etch_Board::STATUS_OPT        => 'value',
-			Karo_Kit_Etch_Structure::ENABLED_OPT   => 'value',
-			Karo_Kit_Etch_Structure::DWELL_OPT     => 'value',
-			Karo_Kit_Etch_Structure::PLACEMENT_OPT => 'value',
-			Karo_Kit_Etch_Structure::DISABLED_OPT  => 'value',
-			Karo_Kit_Etch_Sidebar::ENABLED_OPT     => 'value',
-			Karo_Kit_Etch_Sidebar::REMEMBER_OPT    => 'value',
-		);
-	}
-
-	/** @inheritDoc */
-	public static function export_labels(): array {
-		return array(
-			Karo_Kit_Etch_Board::ENABLED_OPT       => __( 'Template Board', 'karo-kit' ),
-			Karo_Kit_Etch_Board::THRESHOLD_OPT     => __( 'Thumbnail refresh threshold', 'karo-kit' ),
-			Karo_Kit_Etch_Board::ORDER_OPT         => __( 'Board column order', 'karo-kit' ),
-			Karo_Kit_Etch_Board::STATUS_OPT        => __( 'Template statuses', 'karo-kit' ),
-			Karo_Kit_Etch_Structure::ENABLED_OPT   => __( 'Structure arrows', 'karo-kit' ),
-			Karo_Kit_Etch_Structure::DWELL_OPT     => __( 'Dwell delay', 'karo-kit' ),
-			Karo_Kit_Etch_Structure::PLACEMENT_OPT => __( 'Arrow position', 'karo-kit' ),
-			Karo_Kit_Etch_Structure::DISABLED_OPT  => __( 'Show unavailable moves', 'karo-kit' ),
-			Karo_Kit_Etch_Sidebar::ENABLED_OPT     => __( 'Sidebar tabs', 'karo-kit' ),
-			Karo_Kit_Etch_Sidebar::REMEMBER_OPT    => __( 'Remember panel state', 'karo-kit' ),
-		);
 	}
 
 	/** @inheritDoc */

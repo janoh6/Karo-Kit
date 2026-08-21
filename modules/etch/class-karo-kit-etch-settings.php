@@ -40,24 +40,7 @@ final class Karo_Kit_Etch_Settings {
 	}
 
 	public static function register(): void {
-		$group = Karo_Kit_Etch::option_group();   // karo_kit_etch
 		$slug  = Karo_Kit_Etch::settings_slug();  // karo-kit-etch
-
-		register_setting( $group, Karo_Kit_Etch_Board::ENABLED_OPT, array(
-			'type'              => 'boolean',
-			'sanitize_callback' => static fn( $v ) => $v ? 1 : 0,
-			'default'           => 1,
-		) );
-		register_setting( $group, Karo_Kit_Etch_Board::THRESHOLD_OPT, array(
-			'type'              => 'integer',
-			'sanitize_callback' => 'absint',
-			'default'           => 3,
-		) );
-		register_setting( $group, Karo_Kit_Etch_Board::AUTO_LIMIT_OPT, array(
-			'type'              => 'integer',
-			'sanitize_callback' => 'absint',
-			'default'           => 6,
-		) );
 
 		// --- Section: Template Board ---
 		add_settings_section( 'karo_kit_etch_board', __( 'Template Board', 'karo-kit' ),
@@ -73,27 +56,6 @@ final class Karo_Kit_Etch_Settings {
 			array( __CLASS__, 'field_auto_limit' ), $slug, 'karo_kit_etch_board' );
 
 		// --- Section: Structure Arrows ---
-		register_setting( $group, Karo_Kit_Etch_Structure::ENABLED_OPT, array(
-			'type'              => 'boolean',
-			'sanitize_callback' => static fn( $v ) => $v ? 1 : 0,
-			'default'           => 1,
-		) );
-		register_setting( $group, Karo_Kit_Etch_Structure::DWELL_OPT, array(
-			'type'              => 'integer',
-			'sanitize_callback' => 'absint',
-			'default'           => 700,
-		) );
-		register_setting( $group, Karo_Kit_Etch_Structure::PLACEMENT_OPT, array(
-			'type'              => 'string',
-			'sanitize_callback' => array( __CLASS__, 'sanitize_placement' ),
-			'default'           => 'prepend',
-		) );
-		register_setting( $group, Karo_Kit_Etch_Structure::DISABLED_OPT, array(
-			'type'              => 'boolean',
-			'sanitize_callback' => static fn( $v ) => $v ? 1 : 0,
-			'default'           => 0,
-		) );
-
 		add_settings_section( 'karo_kit_etch_structure', __( 'Structure Arrows', 'karo-kit' ),
 			array( __CLASS__, 'section_structure_intro' ), $slug );
 
@@ -107,17 +69,6 @@ final class Karo_Kit_Etch_Settings {
 			array( __CLASS__, 'field_show_disabled' ), $slug, 'karo_kit_etch_structure' );
 
 		// --- Section: Sidebar Tabs ---
-		register_setting( $group, Karo_Kit_Etch_Sidebar::ENABLED_OPT, array(
-			'type'              => 'boolean',
-			'sanitize_callback' => static fn( $v ) => $v ? 1 : 0,
-			'default'           => 1,
-		) );
-		register_setting( $group, Karo_Kit_Etch_Sidebar::REMEMBER_OPT, array(
-			'type'              => 'boolean',
-			'sanitize_callback' => static fn( $v ) => $v ? 1 : 0,
-			'default'           => 1,
-		) );
-
 		add_settings_section( 'karo_kit_etch_sidebar', __( 'Sidebar Tabs', 'karo-kit' ),
 			array( __CLASS__, 'section_sidebar_intro' ), $slug );
 
