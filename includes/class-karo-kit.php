@@ -5,14 +5,21 @@
  * @package Karo_Kit
  */
 
+use KaroKit\Core\Module\Module;
+use KaroKit\Core\Options\Option;
+use KaroKit\Core\Options\Registry;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 final class Karo_Kit {
 
-	/** @var array<string,class-string<Karo_Kit_Module>> id => module class */
+	/** @var array<string,Module> id => module instance */
 	private static array $modules = array();
+
+	/** Built once in boot(), from every module's options() plus the kit's own. */
+	private static ?Registry $registry = null;
 
 	/** Hook suffix of our admin page, set once add_menu_page() runs. */
 	private static string $hook = '';
@@ -26,22 +33,15 @@ final class Karo_Kit {
 	/** Settings that belong to the kit itself rather than to any one module. */
 	const OPTION_GROUP = 'karo_kit';
 
-	/** Bumped when the seeding routine changes what it writes. */
-	const SEED_VERSION = 1;
-
-	const SEED_VERSION_OPTION = 'karo_kit_seed_version';
-
-	/** Register a module class (must extend Karo_Kit_Module). */
-	public static function register( string $class ): void {
-		if ( is_subclass_of( $class, Karo_Kit_Module::class ) ) {
-			self::$modules[ $class::id() ] = $class;
-		}
+	/** Register a module instance. */
+	public static function register( Module $module ): void {
+		self::$modules[ $module->id() ] = $module;
 	}
 
 	/** Boot every registered module + the admin shell. */
 	public static function boot(): void {
-		foreach ( self::$modules as $class ) {
-			$class::init();
+		foreach ( self::$modules as $module ) {
+			$module->boot();
 		}
 		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
@@ -55,7 +55,10 @@ final class Karo_Kit {
 		Karo_Kit_Log::init();
 		Karo_Kit_Accent::init();
 		add_action( 'admin_init', array( __CLASS__, 'ensure_cron' ) );
-		add_action( 'admin_init', array( __CLASS__, 'maybe_seed_defaults' ) );
+		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
+		add_action( 'admin_init', static function () {
+			Karo_Kit::registry()->seedDefaults();
+		} );
 	}
 
 	/**
@@ -75,7 +78,7 @@ final class Karo_Kit {
 		}
 
 		$option = isset( $_POST['option'] ) ? sanitize_key( wp_unslash( $_POST['option'] ) ) : '';
-		if ( ! in_array( $option, self::writable_options(), true ) ) {
+		if ( ! in_array( $option, self::registry()->settingNames(), true ) ) {
 			wp_send_json_error( array( 'message' => __( 'Unknown setting.', 'karo-kit' ) ), 400 );
 		}
 
@@ -91,25 +94,68 @@ final class Karo_Kit {
 		wp_send_json_success( array( 'value' => get_option( $option ) ) );
 	}
 
-	/** Option names registered to our modules' settings groups. */
-	private static function writable_options(): array {
-		$groups = array( self::OPTION_GROUP );
-		foreach ( self::$modules as $class ) {
-			$groups[] = $class::option_group();
-		}
-
-		$allowed = array();
-		foreach ( get_registered_settings() as $name => $args ) {
-			if ( isset( $args['group'] ) && in_array( $args['group'], $groups, true ) ) {
-				$allowed[] = $name;
-			}
-		}
-		return $allowed;
-	}
-
-	/** @return array<string,class-string<Karo_Kit_Module>> */
+	/** @return array<string,Module> */
 	public static function modules(): array {
 		return self::$modules;
+	}
+
+	/**
+	 * The kit's own options -- those that belong to no module (the accent
+	 * source, the theme, lifecycle/DB-version flags). Empty until the next
+	 * task populates it; the method exists now so registry() has a real,
+	 * stable thing to call.
+	 *
+	 * @return Option[]
+	 */
+	public static function options(): array {
+		return array();
+	}
+
+	/** Every module's options() plus the kit's own, merged into one Registry. */
+	public static function registry(): Registry {
+		if ( null === self::$registry ) {
+			self::$registry = new Registry();
+			foreach ( self::options() as $option ) {
+				self::$registry->add( $option );
+			}
+			foreach ( self::$modules as $module ) {
+				foreach ( $module->options() as $option ) {
+					self::$registry->add( $option );
+				}
+			}
+		}
+		return self::$registry;
+	}
+
+	/**
+	 * Register every setting:true option with WordPress, scoped to its own
+	 * module's settings group. Registry stays flat and knows nothing about
+	 * groups (see Registry's own docblock); this loop is the per-group
+	 * scoping that flatness defers to the caller.
+	 */
+	public static function register_settings(): void {
+		foreach ( self::$modules as $module ) {
+			foreach ( $module->options() as $option ) {
+				if ( ! $option->setting ) {
+					continue;
+				}
+				register_setting( $module->optionGroup(), $option->name, array(
+					'type'              => Registry::wpType( $option->type ),
+					'sanitize_callback' => Registry::sanitizerFor( $option ),
+					'default'           => $option->default,
+				) );
+			}
+		}
+		foreach ( self::options() as $option ) {
+			if ( ! $option->setting ) {
+				continue;
+			}
+			register_setting( self::OPTION_GROUP, $option->name, array(
+				'type'              => Registry::wpType( $option->type ),
+				'sanitize_callback' => Registry::sanitizerFor( $option ),
+				'default'           => $option->default,
+			) );
+		}
 	}
 
 	/**
@@ -292,7 +338,7 @@ final class Karo_Kit {
 		} elseif ( 'transfer' === $active ) {
 			Karo_Kit_Transfer::render_preview();
 		} else {
-			self::$modules[ $active ]::render_page();
+			self::$modules[ $active ]->renderPage();
 		}
 		echo '</main>';
 		echo '</div>';
@@ -328,8 +374,8 @@ final class Karo_Kit {
 			esc_url( admin_url( 'admin.php?page=karo-kit&tab=dashboard' ) ),
 			esc_html__( 'Dashboard', 'karo-kit' )
 		);
-		foreach ( self::$modules as $id => $class ) {
-			$sections = $class::nav_sections();
+		foreach ( self::$modules as $id => $module ) {
+			$sections = $module->navSections();
 
 			// No sub-sections: one tab bearing the module's own label.
 			if ( ! $sections ) {
@@ -337,7 +383,7 @@ final class Karo_Kit {
 					'<a class="kk-tab %s" href="%s">%s</a>',
 					( $active === $id ) ? 'kk-tab--active' : '',
 					esc_url( admin_url( 'admin.php?page=karo-kit&tab=' . $id ) ),
-					esc_html( $class::label() )
+					esc_html( $module->label() )
 				);
 				continue;
 			}
@@ -406,8 +452,8 @@ final class Karo_Kit {
 		);
 
 		$groups = array();
-		foreach ( self::$modules as $id => $class ) {
-			foreach ( $class::dashboard_groups() as $group ) {
+		foreach ( self::$modules as $id => $module ) {
+			foreach ( $module->dashboardGroups() as $group ) {
 				$group['module'] = $id;
 				$groups[]        = $group;
 			}
@@ -600,59 +646,6 @@ final class Karo_Kit {
 		);
 	}
 
-	/**
-	 * Give the Gate toggles a real database row.
-	 *
-	 * get_option() cannot tell "never set" apart from "set to off", and
-	 * Karo_Kit_Gate_Auth::filter_users_can_register() reads a falsy value as
-	 * "closed" — so on a site that installed the kit and never opened its
-	 * settings, Karo Kit silently closed a registration screen the site had
-	 * deliberately enabled. Writing an explicit row makes the two states
-	 * distinguishable.
-	 *
-	 * Registration is seeded from core's own users_can_register rather than
-	 * from a fixed default: that is the answer this site already gave to the
-	 * same question, so seeding from it preserves the admin's intent instead
-	 * of imposing one of ours.
-	 *
-	 * Activation alone would not do — an in-place update never fires it, and
-	 * in-place updates are exactly the sites already carrying the bug. Hence
-	 * the version-guarded admin_init pass, matching the pattern in
-	 * Karo_Kit_Log::maybe_install().
-	 */
-	public static function maybe_seed_defaults(): void {
-		if ( (int) get_option( self::SEED_VERSION_OPTION ) === self::SEED_VERSION ) {
-			return;
-		}
-
-		// Karo_Kit_Gate_Settings logs a change whenever one of these options is
-		// added or updated -- appropriate for an admin's own choice, wrong here:
-		// seeding is a one-time upgrade action, not something anyone did, and it
-		// must not appear in the security audit log as though it were.
-		remove_all_actions( 'add_option_karo_kit_gate_registration_on' );
-		remove_all_actions( 'add_option_karo_kit_gate_maintenance_on' );
-		remove_all_actions( 'add_option_karo_kit_gate_hide_login' );
-
-		// Karo_Kit_Gate_Auth::filter_users_can_register() returns false whenever
-		// karo_kit_gate_registration_on is unset -- exactly the condition seeding
-		// runs under. Reading through that filter would make this read always
-		// observe the very bug being fixed and invert the seed. Read core's own
-		// unfiltered value instead.
-		$had_filter = remove_filter( 'option_users_can_register', array( 'Karo_Kit_Gate_Auth', 'filter_users_can_register' ) );
-		$core_registration = get_option( 'users_can_register' );
-		if ( $had_filter ) {
-			add_filter( 'option_users_can_register', array( 'Karo_Kit_Gate_Auth', 'filter_users_can_register' ) );
-		}
-
-		// add_option() is a no-op when the option already exists, so a
-		// deliberate choice is never overwritten.
-		add_option( 'karo_kit_gate_registration_on', $core_registration ? '1' : '0' );
-		add_option( 'karo_kit_gate_maintenance_on', '0' );
-		add_option( 'karo_kit_gate_hide_login', '0' );
-
-		update_option( self::SEED_VERSION_OPTION, self::SEED_VERSION );
-	}
-
 	/** Idempotent; also covers in-place updates, which skip activation. */
 	public static function ensure_cron(): void {
 		if ( ! wp_next_scheduled( self::CRON_DAILY ) ) {
@@ -662,7 +655,7 @@ final class Karo_Kit {
 
 	public static function activate(): void {
 		update_option( 'karo_kit_version', KARO_KIT_VER );
-		self::maybe_seed_defaults();
+		self::registry()->seedDefaults();
 		Karo_Kit_Log::install();
 		Karo_Kit_Gate_Security::install();
 		self::ensure_cron();

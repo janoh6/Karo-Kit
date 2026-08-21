@@ -52,9 +52,13 @@ require_once KARO_KIT_DIR . 'vendor/autoload.php';
 // Outside any hook, per the update checker's own guidance — see the class.
 Karo_Kit_Updates::init();
 
-// Register modules with the core. Future modules add one line here.
-Karo_Kit::register( 'Karo_Kit_Gate' );
-Karo_Kit::register( 'Karo_Kit_Etch' );
+// Register modules with the core, wrapped so the rest of the kit sees a
+// Module instance rather than the concrete static class underneath. Future
+// modules add one line here. Real Module implementations arrive in v0.18.0
+// (Gate) and v0.19.0 (Etch); until then both run through the adapter,
+// entirely unmodified.
+Karo_Kit::register( new KaroKit\Core\Module\StaticModuleAdapter( 'Karo_Kit_Gate' ) );
+Karo_Kit::register( new KaroKit\Core\Module\StaticModuleAdapter( 'Karo_Kit_Etch' ) );
 
 // Boot once all plugins are loaded.
 add_action( 'plugins_loaded', static function () {

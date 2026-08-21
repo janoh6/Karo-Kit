@@ -56,6 +56,17 @@ final class Karo_Kit_Etch extends Karo_Kit_Module {
 	}
 
 	/**
+	 * @return \KaroKit\Core\Options\Option[]
+	 *
+	 * Empty for now -- the real Gate option declarations move here in the
+	 * next task. Exists already so Task 7's registry-merging path has
+	 * something real to call while Karo_Kit::boot() is being wired.
+	 */
+	public static function options(): array {
+		return array();
+	}
+
+	/**
 	 * URL for a bundled asset, cache-busted by its own modification time.
 	 *
 	 * Not the plugin version: these files are edited far more often than the

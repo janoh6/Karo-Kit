@@ -44,6 +44,17 @@ final class Karo_Kit_Gate extends Karo_Kit_Module {
 		Karo_Kit_Gate_Settings::render_page();
 	}
 
+	/**
+	 * @return \KaroKit\Core\Options\Option[]
+	 *
+	 * Empty for now -- the real Gate option declarations move here in the
+	 * next task. Exists already so Task 7's registry-merging path has
+	 * something real to call while Karo_Kit::boot() is being wired.
+	 */
+	public static function options(): array {
+		return array();
+	}
+
 	/** Site Access / Maintenance / Etch appear as their own top-level tabs. */
 	public static function nav_sections(): array {
 		return Karo_Kit_Gate_Settings::TABS;
