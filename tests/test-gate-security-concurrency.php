@@ -124,6 +124,14 @@ class Test_Gate_Security_Concurrency extends TestCase {
 		);
 		self::diag( 'parent raw row read on OLD connection', $row_before_reconnect );
 
+		// DIAGNOSTIC ONLY: is the table's primary key actually being enforced?
+		// If ON DUPLICATE KEY UPDATE never fires, every writer's INSERT succeeds
+		// as an independent row instead of colliding — this would show up as
+		// far more than 1 row here.
+		self::diag( 'row count in table', $wpdb->get_var( 'SELECT COUNT(*) FROM ' . Karo_Kit_Gate_Security::table() ) );
+		self::diag( 'show create table', $wpdb->get_var( 'SHOW CREATE TABLE ' . Karo_Kit_Gate_Security::table(), 1 ) );
+		self::diag( 'all rows', $wpdb->get_results( 'SELECT ip_hash, context, attempts, window_start FROM ' . Karo_Kit_Gate_Security::table() ) );
+
 		// The children replaced their inherited copy of the connection; make
 		// sure this process is holding a live one of its own.
 		$GLOBALS['wpdb']->db_connect();
