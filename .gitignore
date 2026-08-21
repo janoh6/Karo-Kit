@@ -37,9 +37,6 @@ Thumbs.db
 .phpunit.result.cache
 coverage/
 
-# Composer
-composer.lock
-
 # npm
 npm-debug.log*
 yarn-debug.log*

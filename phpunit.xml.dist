@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<phpunit
+	bootstrap="tests/bootstrap.php"
+	backupGlobals="false"
+	colors="true"
+	>
+	<testsuites>
+		<testsuite name="karo-kit">
+			<directory prefix="test-" suffix=".php">./tests/</directory>
+		</testsuite>
+	</testsuites>
+	<groups>
+		<exclude>
+			<!-- Forks real processes; run explicitly with --group concurrency. -->
+			<group>concurrency</group>
+		</exclude>
+	</groups>
+</phpunit>
