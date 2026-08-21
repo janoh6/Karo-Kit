@@ -34,6 +34,14 @@ foreach ( Karo_Kit::registry()->uninstallNames() as $karo_kit_option ) {
 // a site that ran v0.16.9 doesn't keep this one orphaned row forever.
 delete_option( 'karo_kit_seed_version' );
 
+// karo_kit_log (Karo_Kit_Log::LEGACY_OPTION) is a one-time, pre-1.0
+// migration artifact that Karo_Kit_Log::migrate_legacy() explicitly
+// deletes once and is meant to stay gone -- unlike the other lifecycle
+// flags, it must never be declared as a seedable Option, or
+// Registry::seedDefaults() would resurrect an empty, autoloaded row on
+// every already-migrated site forever. Delete it directly instead.
+delete_option( Karo_Kit_Log::LEGACY_OPTION );
+
 // The activity log has its own table.
 global $wpdb;
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange

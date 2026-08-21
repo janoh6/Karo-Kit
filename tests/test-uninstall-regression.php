@@ -16,6 +16,7 @@ class Test_Uninstall_Regression extends WP_UnitTestCase {
 		return array(
 			'karo_kit_version',
 			'karo_kit_seed_version', // deleted as a constant in Task 7; still expected in the merged uninstall list below via a dedicated assertion, since a site that ran v0.16.9 has a real row to clean up
+			'karo_kit_log', // Karo_Kit_Log::LEGACY_OPTION -- a one-time pre-1.0 migration artifact, deliberately never declared as a seedable Option (would resurrect an empty row on every admin_init); deleted directly in uninstall.php instead, same as karo_kit_seed_version
 			'karo_kit_accent_source',
 			'karo_kit_gate_login_page',
 			'karo_kit_gate_register_page',
@@ -53,8 +54,8 @@ class Test_Uninstall_Regression extends WP_UnitTestCase {
 	public function test_registry_uninstall_names_cover_every_option_the_old_list_deleted(): void {
 		$names = Karo_Kit::registry()->uninstallNames();
 		foreach ( $this->original_list() as $expected ) {
-			if ( 'karo_kit_seed_version' === $expected ) {
-				continue; // asserted separately: it's in uninstall.php's static list directly, not the Registry, since Task 7 deleted the constant it used to be declared from
+			if ( in_array( $expected, array( 'karo_kit_seed_version', 'karo_kit_log' ), true ) ) {
+				continue; // both are deleted directly in uninstall.php, not via the Registry -- karo_kit_seed_version since Task 7 deleted the constant it used to be declared from, karo_kit_log because it's a one-time migration artifact that must never be seeded again
 			}
 			$this->assertContains( $expected, $names, "{$expected} is missing from the Registry's uninstall list -- this is a regression, not an approved change" );
 		}

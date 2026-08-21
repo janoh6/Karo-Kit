@@ -132,17 +132,6 @@ final class Karo_Kit {
 				default: '',
 				setting: false,
 			),
-			// The pre-1.0 option-backed activity log, migrated into its own
-			// table by Karo_Kit_Log::install() and then deleted -- but a site
-			// stuck on that migration (or one that never reached admin_init
-			// again) can still have this row. Declared purely for the
-			// Registry's uninstall list, same as karo_kit_version above.
-			new Option(
-				name: Karo_Kit_Log::LEGACY_OPTION,
-				type: 'array',
-				default: array(),
-				setting: false,
-			),
 			// The log table's schema version. Not a setting, not exported --
 			// but a real wp_options row the old hardcoded uninstall list
 			// deleted, and dropping it here would have silently shrunk that
