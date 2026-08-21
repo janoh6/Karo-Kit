@@ -5,6 +5,8 @@
  * @package Karo_Kit\Gate
  */
 
+use KaroKit\Core\Options\Option;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -44,15 +46,112 @@ final class Karo_Kit_Gate extends Karo_Kit_Module {
 		Karo_Kit_Gate_Settings::render_page();
 	}
 
-	/**
-	 * @return \KaroKit\Core\Options\Option[]
-	 *
-	 * Empty for now -- the real Gate option declarations move here in the
-	 * next task. Exists already so Task 7's registry-merging path has
-	 * something real to call while Karo_Kit::boot() is being wired.
-	 */
+	/** @return \KaroKit\Core\Options\Option[] */
 	public static function options(): array {
-		return array();
+		$pages = array();
+		foreach ( array_keys( self::PAGE_OPTIONS ) as $key ) {
+			$pages[] = new Option(
+				name: "karo_kit_gate_{$key}",
+				type: 'page',
+				default: 0,
+				label: self::PAGE_OPTIONS[ $key ],
+				export: true,
+			);
+		}
+
+		return array_merge( $pages, array(
+			new Option(
+				name: 'karo_kit_gate_maintenance_page',
+				type: 'page',
+				default: 0,
+				label: __( 'Maintenance page', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: 'karo_kit_gate_maintenance_on',
+				type: 'bool',
+				default: false,
+				label: __( 'Maintenance gate', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: 'karo_kit_gate_maintenance_mode',
+				type: 'enum',
+				default: 'maintenance',
+				label: __( 'Maintenance mode', 'karo-kit' ),
+				export: true,
+				enum: array_map( static fn( $case ) => $case->value, Karo_Kit_Gate_Mode::cases() ),
+			),
+			new Option(
+				name: 'karo_kit_gate_registration_on',
+				type: 'bool',
+				default: false,
+				defaultCallback: static function () {
+					// Karo_Kit_Gate_Auth::filter_users_can_register() returns
+					// false whenever this option is unset -- exactly the
+					// condition seeding runs under. Reading through that
+					// filter would make this read always observe the very
+					// bug it exists to fix. Read core's own unfiltered value.
+					$had_filter = remove_filter( 'option_users_can_register', array( 'Karo_Kit_Gate_Auth', 'filter_users_can_register' ) );
+					$core_value = get_option( 'users_can_register' );
+					if ( $had_filter ) {
+						add_filter( 'option_users_can_register', array( 'Karo_Kit_Gate_Auth', 'filter_users_can_register' ) );
+					}
+					return $core_value ? '1' : '0';
+				},
+				label: __( 'Registration', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: 'karo_kit_gate_lockout_max',
+				type: 'int',
+				default: 5,
+				label: __( 'Max attempts', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: 'karo_kit_gate_lockout_window',
+				type: 'int',
+				default: 15,
+				label: __( 'Attempt window', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: 'karo_kit_gate_lockout_cooldown',
+				type: 'int',
+				default: 60,
+				label: __( 'Lockout length', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: 'karo_kit_gate_hide_login',
+				type: 'bool',
+				default: false,
+				label: __( 'Hide login URL', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: 'karo_kit_gate_login_slug',
+				type: 'key',
+				default: '',
+				// Deliberately not exported: this is the secret that hides
+				// the login URL, and an export file is something people
+				// email around.
+			),
+			new Option(
+				name: 'karo_kit_gate_denied_page',
+				type: 'page',
+				default: 0,
+				label: __( 'Blocked page', 'karo-kit' ),
+				export: true,
+			),
+			new Option(
+				name: Karo_Kit_Gate_Security::DB_VERSION_OPTION,
+				type: 'int',
+				default: 0,
+				setting: false,
+			),
+		) );
 	}
 
 	/** Site Access / Maintenance / Etch appear as their own top-level tabs. */
