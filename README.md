@@ -67,6 +67,19 @@ couldn't match, before anything is written.
 
 == Changelog ==
 
+= 0.17.0 =
+* Internal: settings are now declared once, in one place per module,
+  instead of separately in four -- the code that registers a setting
+  with WordPress, exports it, deletes it on uninstall, and allows it
+  through the dashboard's autosave endpoint all now come from the same
+  declaration. No visible change for existing sites.
+* Fix: deleting the plugin left the custom accent colour
+  (`karo_kit_accent_custom`) behind in the database -- it never made it
+  into the uninstall cleanup list. It's included now.
+* Fix: the Template Board's auto-thumbnail limit didn't travel with a
+  settings export, unlike every one of its sibling settings. It's
+  included now.
+
 = 0.16.9 =
 * Security: the login rate limiter could undercount failed attempts.
   Each failure read the counter, added one in PHP, and wrote it back, so
