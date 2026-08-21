@@ -44,22 +44,8 @@ final class Karo_Kit_Accent {
 		'base'      => 'Base',
 	);
 
-	public static function init(): void {
-		add_action( 'admin_init', array( __CLASS__, 'register' ) );
-	}
-
-	public static function register(): void {
-		register_setting( Karo_Kit::OPTION_GROUP, self::SOURCE_OPT, array(
-			'type'              => 'string',
-			'sanitize_callback' => array( __CLASS__, 'sanitize_source' ),
-			'default'           => '',
-		) );
-		register_setting( Karo_Kit::OPTION_GROUP, self::CUSTOM_OPT, array(
-			'type'              => 'string',
-			'sanitize_callback' => array( __CLASS__, 'normalise_hex' ),
-			'default'           => '',
-		) );
-	}
+	/** register_setting() calls now come from Karo_Kit::register_settings(), driven by Karo_Kit::options(). */
+	public static function init(): void {}
 
 	public static function sanitize_source( $value ): string {
 		$value = sanitize_key( (string) $value );

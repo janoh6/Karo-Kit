@@ -100,15 +100,39 @@ final class Karo_Kit {
 	}
 
 	/**
-	 * The kit's own options -- those that belong to no module (the accent
-	 * source, the theme, lifecycle/DB-version flags). Empty until the next
-	 * task populates it; the method exists now so registry() has a real,
-	 * stable thing to call.
+	 * The kit's own options -- those that belong to no module.
 	 *
 	 * @return Option[]
 	 */
 	public static function options(): array {
-		return array();
+		return array(
+			new Option(
+				name: Karo_Kit_Accent::SOURCE_OPT,
+				type: 'enum',
+				default: '',
+				label: __( 'Accent colour source', 'karo-kit' ),
+				export: true,
+				enum: array_merge( array_keys( Karo_Kit_Accent::FAMILIES ), array( 'custom' ) ),
+			),
+			new Option(
+				name: Karo_Kit_Accent::CUSTOM_OPT,
+				type: 'hex',
+				default: '',
+				// Not exported -- unchanged from before this refactor. Now
+				// correctly deleted on uninstall, which it previously wasn't
+				// (see Deviation 5 in this plan's header).
+			),
+			// Lifecycle flag: written explicitly by activate() with the
+			// current KARO_KIT_VER, never meaningfully "seeded" -- declared
+			// here purely so uninstall.php's delete list comes from the
+			// Registry rather than a hand-maintained array.
+			new Option(
+				name: 'karo_kit_version',
+				type: 'string',
+				default: '',
+				setting: false,
+			),
+		);
 	}
 
 	/** Every module's options() plus the kit's own, merged into one Registry. */
