@@ -67,6 +67,14 @@ couldn't match, before anything is written.
 
 == Changelog ==
 
+= 0.17.1 =
+* Fix: the Template Board's auto-generated thumbnails could show a
+  page's footer landing right below the header instead of at the true
+  bottom, on themes whose layout depends on the header/main/footer
+  being direct children of `<body>`. The preview route used for
+  thumbnail capture was wrapping them in an extra container that broke
+  that -- it no longer does.
+
 = 0.17.0 =
 * Internal: settings are now declared once, in one place per module,
   instead of separately in four -- the code that registers a setting
