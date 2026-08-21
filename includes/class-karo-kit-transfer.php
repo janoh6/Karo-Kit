@@ -272,6 +272,46 @@ final class Karo_Kit_Transfer {
 
 	/* ---- Apply ------------------------------------------------------------ */
 
+	/**
+	 * Write a reviewed plan.
+	 *
+	 * Rows whose value already matches are counted apart from rows actually
+	 * written. Importing a file exported from this same site should report
+	 * that nothing changed, not that everything was applied — and it should
+	 * not spend an update_option() (with every sanitize callback and option
+	 * hook behind it) rewriting a value to itself.
+	 *
+	 * @param array<int,array<string,mixed>> $rows Output of plan().
+	 * @return array{applied:int,unchanged:int,skipped:int}
+	 */
+	public static function apply_plan( array $rows ): array {
+		$applied   = 0;
+		$unchanged = 0;
+		$skipped   = 0;
+
+		foreach ( $rows as $row ) {
+			if ( ! array_key_exists( 'value', $row )
+				|| ! in_array( $row['status'], array( 'ok', 'same' ), true ) ) {
+				$skipped++;
+				continue;
+			}
+
+			if ( 'same' === $row['status'] ) {
+				$unchanged++;
+				continue;
+			}
+
+			update_option( $row['option'], $row['value'] );
+			$applied++;
+		}
+
+		return array(
+			'applied'   => $applied,
+			'unchanged' => $unchanged,
+			'skipped'   => $skipped,
+		);
+	}
+
 	public static function handle_apply(): void {
 		if ( empty( $_POST['karo_kit_import_apply'] ) ) {
 			return;
@@ -289,30 +329,22 @@ final class Karo_Kit_Transfer {
 
 		// Re-plan rather than trusting anything posted back: the allowlist and
 		// page resolution are applied again at write time.
-		$applied = 0;
-		$skipped = 0;
-		foreach ( self::plan( $data ) as $row ) {
-			if ( ! in_array( $row['status'], array( 'ok', 'same' ), true ) || ! array_key_exists( 'value', $row ) ) {
-				$skipped++;
-				continue;
-			}
-			update_option( $row['option'], $row['value'] );
-			$applied++;
-		}
+		$counts = self::apply_plan( self::plan( $data ) );
 
 		delete_transient( self::STASH . get_current_user_id() );
 
 		Karo_Kit_Log::add(
 			'import',
 			sprintf(
-				/* translators: 1: settings written, 2: settings skipped */
-				__( 'Settings imported — %1$d applied, %2$d skipped', 'karo-kit' ),
-				$applied,
-				$skipped
+				/* translators: 1: settings written, 2: settings already matching, 3: settings skipped */
+				__( 'Settings imported — %1$d applied, %2$d already set, %3$d skipped', 'karo-kit' ),
+				$counts['applied'],
+				$counts['unchanged'],
+				$counts['skipped']
 			)
 		);
 
-		wp_safe_redirect( admin_url( 'admin.php?page=karo-kit&tab=dashboard&imported=' . $applied ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=karo-kit&tab=dashboard&imported=' . $counts['applied'] ) );
 		exit;
 	}
 
