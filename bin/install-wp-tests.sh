@@ -236,6 +236,29 @@ install_test_suite() {
 		sed $ioption "s/yourusernamehere/$DB_USER/" "$WP_TESTS_DIR"/wp-tests-config.php
 		sed $ioption "s/yourpasswordhere/$DB_PASS/" "$WP_TESTS_DIR"/wp-tests-config.php
 		sed $ioption "s|localhost|${DB_HOST}|" "$WP_TESTS_DIR"/wp-tests-config.php
+		# The sample config ships every AUTH_KEY/AUTH_SALT-family constant as the
+		# literal placeholder "put your unique phrase here". wp_salt() treats
+		# that exact string as unconfigured and falls back to a randomly
+		# generated value it persists to the options table on first use -- fine
+		# for a single process, but under concurrent forked processes that all
+		# need it before any of them has persisted one yet, it's a
+		# check-then-write race: each process can independently generate and
+		# cache its own value in a static variable, so two processes hashing
+		# the identical input diverge. Karo Kit's rate limiter hashes an
+		# IP+identity pair with wp_hash(), and a test that forks ten processes
+		# to hit that same key needs the hash to actually be the same key
+		# across all of them.
+		#
+		# Giving every constant the SAME fixed string does not work: wp_salt()
+		# explicitly detects values shared across more than one of these eight
+		# constants and treats them as still-placeholder, falling back to the
+		# same racy path regardless of what the shared string actually is (see
+		# the $duplicated_keys logic in wp-includes/pluggable.php). Each one
+		# needs a distinct value, so a plain global substitution is not enough
+		# -- each define() line is targeted by its own constant name.
+		for wp_test_salt_const in AUTH_KEY SECURE_AUTH_KEY LOGGED_IN_KEY NONCE_KEY AUTH_SALT SECURE_AUTH_SALT LOGGED_IN_SALT NONCE_SALT; do
+			sed $ioption "/'${wp_test_salt_const}'/s/put your unique phrase here/karo-kit-test-${wp_test_salt_const,,}-$(date +%s%N)-${RANDOM}/" "$WP_TESTS_DIR"/wp-tests-config.php
+		done
 		echo -e "${GREEN}Test suite configured.${RESET}"
 	else
 		echo -e "${CYAN}Test suite is already configured.${RESET}"
