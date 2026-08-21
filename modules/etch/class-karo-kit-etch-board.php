@@ -472,7 +472,13 @@ final class Karo_Kit_Etch_Board {
 		if ( ! $post || '0000-00-00 00:00:00' === $post->post_modified_gmt ) {
 			return null;
 		}
-		return date_i18n( 'M j', strtotime( $post->post_modified ) );
+		// The GMT column with an explicit suffix, then wp_date() to render in
+		// the site's timezone. post_modified is local time, and strtotime()
+		// would read it in PHP's timezone — which WordPress pins to UTC — so
+		// the date came out shifted by the site's offset, sometimes landing on
+		// the wrong day. Karo_Kit_Log::when() and Gate's to_time() already do
+		// it this way.
+		return wp_date( 'M j', strtotime( $post->post_modified_gmt . ' UTC' ) );
 	}
 
 	/* ---- Status (dev-progress annotation: wip / review / ready / live) ---- */
