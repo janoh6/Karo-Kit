@@ -51,10 +51,18 @@ class Test_Karo_Kit_Boot extends WP_UnitTestCase {
 	}
 
 	public function test_registry_merges_every_registered_modules_options_with_the_kits_own(): void {
-		$reflection = new ReflectionClass( Karo_Kit::class );
-		$modules    = $reflection->getProperty( 'modules' );
+		$reflection      = new ReflectionClass( Karo_Kit::class );
+		$modules         = $reflection->getProperty( 'modules' );
 		$modules->setAccessible( true );
-		$original = $modules->getValue();
+		$original_modules = $modules->getValue();
+		// registry() lazily builds and caches self::$registry on first call --
+		// building it here from a fixture-only $modules would otherwise poison
+		// every later test in this process that expects the real Gate/Etch
+		// options to be in Karo_Kit::registry(), since nothing else ever resets
+		// this cache. Save and restore it exactly like $modules.
+		$registry_prop    = $reflection->getProperty( 'registry' );
+		$registry_prop->setAccessible( true );
+		$original_registry = $registry_prop->getValue();
 		$modules->setValue( null, array() );
 
 		Karo_Kit::register( new StaticModuleAdapter( Test_Fixture_Boot_Module::class ) );
@@ -63,6 +71,7 @@ class Test_Karo_Kit_Boot extends WP_UnitTestCase {
 		$this->assertInstanceOf( Registry::class, $registry );
 		$this->assertTrue( $registry->has( 'karo_kit_boot_fixture_flag' ) );
 
-		$modules->setValue( null, $original );
+		$modules->setValue( null, $original_modules );
+		$registry_prop->setValue( null, $original_registry );
 	}
 }

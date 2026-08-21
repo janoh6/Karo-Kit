@@ -80,7 +80,15 @@ class Test_Registry extends WP_UnitTestCase {
 	public function test_seed_defaults_writes_static_defaults(): void {
 		$this->registry()->seedDefaults();
 
-		$this->assertSame( '', get_option( 'karo_kit_test_a' ) ); // bool default false -> add_option stores it, get_option casts on read via our Repository, not here
+		// add_option() caches the raw, pre-SQL-cast PHP value (false) into the
+		// 'alloptions' object cache, while the row actually written to the DB
+		// holds the SQL-cast string (''). get_option() reads the cache first,
+		// so within this same request it still sees the raw false -- forcing
+		// a cache reload is what actually proves seedDefaults() persisted the
+		// row, rather than just asserting a value get_option() would also
+		// return for an option that was never written at all.
+		wp_cache_delete( 'alloptions', 'options' );
+		$this->assertSame( '', get_option( 'karo_kit_test_a' ) );
 		$this->assertSame( '5', get_option( 'karo_kit_test_b' ) );
 	}
 

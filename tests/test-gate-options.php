@@ -70,14 +70,22 @@ class Test_Gate_Options extends WP_UnitTestCase {
 		$this->assertFalse( $option->default );
 	}
 
-	public function test_login_slug_is_key_type_not_exported_but_is_uninstalled(): void {
+	public function test_login_slug_is_slug_type_not_exported_but_is_uninstalled(): void {
 		$option = $this->registry()->get( 'karo_kit_gate_login_slug' );
-		$this->assertSame( 'key', $option->type );
+		// 'slug' -- not 'key' -- restores the reserved-word blocklist that
+		// plain sanitize_key() dropped (see the final-review fix wave).
+		$this->assertSame( 'slug', $option->type );
 		$this->assertFalse( $option->export );
 		$this->assertTrue( $option->uninstall );
 
 		$fn = Registry::sanitizerFor( $option );
-		$this->assertSame( 'mysecret', $fn( 'My Secret!' ) );
+		// sanitize_title() (via sanitize_slug()), not sanitize_key() -- hyphenates
+		// spaces instead of stripping them.
+		$this->assertSame( 'my-secret', $fn( 'My Secret!' ) );
+
+		// The whole point of the 'slug' type over plain 'key': reserved WP
+		// paths are rejected, not handed out as the hide-login bypass secret.
+		$this->assertSame( '', $fn( 'wp-admin' ) );
 	}
 
 	public function test_registration_on_has_a_default_callback_not_a_static_default(): void {
