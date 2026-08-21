@@ -125,6 +125,7 @@ final class Registry {
 			},
 			'page'  => 'absint',
 			'key'   => 'sanitize_key',
+			'slug'  => array( \Karo_Kit_Gate_Settings::class, 'sanitize_slug' ),
 			'enum'  => static function ( $v ) use ( $option ) {
 				$v = (string) $v;
 				return in_array( $v, $option->enum ?? array(), true ) ? $v : $option->default;

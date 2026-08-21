@@ -132,7 +132,7 @@ final class Karo_Kit_Gate extends Karo_Kit_Module {
 			),
 			new Option(
 				name: 'karo_kit_gate_login_slug',
-				type: 'key',
+				type: 'slug',
 				default: '',
 				// Deliberately not exported: this is the secret that hides
 				// the login URL, and an export file is something people

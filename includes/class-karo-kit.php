@@ -55,9 +55,13 @@ final class Karo_Kit {
 		Karo_Kit_Log::init();
 		Karo_Kit_Accent::init();
 		add_action( 'admin_init', array( __CLASS__, 'ensure_cron' ) );
-		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
+		add_action( 'admin_init', array( __CLASS__, 'register_settings' ), 5 );
 		add_action( 'admin_init', static function () {
-			Karo_Kit::registry()->seedDefaults();
+			$registry = self::registry();
+			foreach ( $registry->all() as $option ) {
+				remove_all_actions( "add_option_{$option->name}" );
+			}
+			$registry->seedDefaults();
 		} );
 	}
 
@@ -672,13 +676,13 @@ final class Karo_Kit {
 
 	public static function activate(): void {
 		update_option( 'karo_kit_version', KARO_KIT_VER );
+		if ( class_exists( 'Karo_Kit_Etch_Board' ) ) {
+			Karo_Kit_Etch_Board::maybe_migrate();
+		}
 		self::registry()->seedDefaults();
 		Karo_Kit_Log::install();
 		Karo_Kit_Gate_Security::install();
 		self::ensure_cron();
-		if ( class_exists( 'Karo_Kit_Etch_Board' ) ) {
-			Karo_Kit_Etch_Board::maybe_migrate();
-		}
 		do_action( 'karo_kit_activate' );
 	}
 
