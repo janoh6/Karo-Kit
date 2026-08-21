@@ -69,6 +69,14 @@ class Test_Registry extends WP_UnitTestCase {
 		$this->assertSame( array( 'karo_kit_test_a' => 'A', 'karo_kit_test_b' => 'B' ), $registry->exportLabels() );
 	}
 
+	public function test_export_labels_omits_an_exported_option_with_no_label(): void {
+		$registry = new Registry();
+		$registry->add( new Option( 'karo_kit_test_unlabeled', 'string', default: '', export: true ) ); // no label
+
+		$this->assertArrayHasKey( 'karo_kit_test_unlabeled', $registry->exportMap() );
+		$this->assertArrayNotHasKey( 'karo_kit_test_unlabeled', $registry->exportLabels() );
+	}
+
 	public function test_seed_defaults_writes_static_defaults(): void {
 		$this->registry()->seedDefaults();
 
@@ -119,9 +127,9 @@ class Test_Registry extends WP_UnitTestCase {
 
 	public function test_sanitizer_for_int_uses_absint_and_clamps_to_min_max(): void {
 		$fn = Registry::sanitizerFor( new Option( 'x', 'int', min: 1, max: 10 ) );
-		$this->assertSame( 1, $fn( -5 ) );
-		$this->assertSame( 10, $fn( 999 ) );
-		$this->assertSame( 5, $fn( 5 ) );
+		$this->assertSame( 1, $fn( 0 ) );      // absint(0) = 0, clamped up to min 1
+		$this->assertSame( 10, $fn( 999 ) );   // absint(999) = 999, clamped down to max 10
+		$this->assertSame( 5, $fn( 5 ) );      // already in range, untouched
 	}
 
 	public function test_sanitizer_for_int_without_bounds_just_absints(): void {
@@ -136,7 +144,7 @@ class Test_Registry extends WP_UnitTestCase {
 
 	public function test_sanitizer_for_key_uses_sanitize_key(): void {
 		$fn = Registry::sanitizerFor( new Option( 'x', 'key' ) );
-		$this->assertSame( 'my-slug', $fn( 'My Slug!!' ) );
+		$this->assertSame( 'myslug', $fn( 'My Slug!!' ) );
 	}
 
 	public function test_sanitizer_for_enum_falls_back_to_default_when_not_a_member(): void {
