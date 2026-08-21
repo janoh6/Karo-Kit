@@ -325,15 +325,29 @@ $options->string( 'karo_kit_gate_login_slug' );
 
 ```php
 interface Module {
-    public static function id(): string;
+    public function id(): string;
     public function label(): string;
+    public function optionGroup(): string;
     /** @return Option[] */
     public function options(): array;
     public function boot(): void;
+    public function renderPage(): void;
     public function dashboardGroups(): array;
     public function navSections(): array;
 }
 ```
+
+Every method is an instance method, `id()` included. A first draft of this
+interface declared `id()` `static`, which cannot survive contact with
+`StaticModuleAdapter` (§2.4): one adapter class wraps *different* underlying
+static classes per instance, so a static method on the adapter class itself
+cannot return a different id per instance. `renderPage()` and
+`optionGroup()` are carried over from the current `Karo_Kit_Module` base
+class — the admin shell needs the first to render a module's settings tab
+at all, and `register_setting()`/`settings_fields()` need the second to
+know which settings group an option belongs to. Both were missing from the
+original six-method draft; adding them is what makes the admin shell keep
+working, not a stylistic nicety.
 
 A small `Container` constructs modules with their dependencies —
 `new Gate( $options, $log, $clock )`. Injecting a `Clock` is what makes the
@@ -343,6 +357,37 @@ through it.
 Constructors only store dependencies; `boot()` registers hooks. That split lets
 `uninstall.php` instantiate modules cheaply to collect their `options()`
 without booting WordPress hooks.
+
+**Registry stays flat; per-group registration is a bootstrap loop, not a
+Registry responsibility.** `uninstall.php`, export, and the AJAX allowlist
+all need the *merged* option set across every module, while
+`register_setting()` needs each option scoped to its own module's settings
+group. Rather than teaching `Option` its own `group` property (every
+declaration would have to repeat it) or giving `Registry` two access modes,
+`Registry` stays exactly the flat collection described in §2.2, and a short
+loop — in `Karo_Kit::boot()` — does the per-group work directly:
+
+```php
+add_action( 'admin_init', static function () use ( $container ) {
+    foreach ( $container->modules() as $module ) {
+        foreach ( $module->options() as $option ) {
+            if ( ! $option->setting ) {
+                continue;
+            }
+            register_setting( $module->optionGroup(), $option->name, array(
+                'type'              => Registry::wpType( $option->type ),
+                'sanitize_callback' => Registry::sanitizerFor( $option ),
+                'default'           => $option->default,
+            ) );
+        }
+    }
+} );
+```
+
+`Registry::wpType()` and `Registry::sanitizerFor()` are public static helpers
+— the type-to-WordPress-args derivation table from §2.2 — callable without
+an instance, since this loop has no need to build a full `Registry` object
+just to reach them.
 
 ### 2.4 The adapter
 
