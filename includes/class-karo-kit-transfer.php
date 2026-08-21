@@ -42,26 +42,33 @@ final class Karo_Kit_Transfer {
 	/* ---- Export ---------------------------------------------------------- */
 
 	/**
-	 * Everything that contributes settings: the kit itself, then each module.
-	 * Keyed the way they appear in the payload.
+	 * Everything that contributes settings, keyed the way they appear in the
+	 * payload: '_kit' for the kit's own options, then each module by id.
 	 *
-	 * @return array<string,class-string>
+	 * @return array<string,\KaroKit\Core\Options\Option[]>
 	 */
 	private static function sources(): array {
-		return array( '_kit' => Karo_Kit::class ) + Karo_Kit::modules();
+		$sources = array( '_kit' => Karo_Kit::options() );
+		foreach ( Karo_Kit::modules() as $id => $module ) {
+			$sources[ $id ] = $module->options();
+		}
+		return $sources;
 	}
 
 	/** @return array The full payload, ready to encode. */
 	public static function payload(): array {
 		$modules = array();
 
-		foreach ( self::sources() as $id => $class ) {
+		foreach ( self::sources() as $id => $module_options ) {
 			$options = array();
 
-			foreach ( $class::export_map() as $option => $kind ) {
-				$options[ $option ] = ( 'page' === $kind )
-					? self::page_ref( (int) get_option( $option ) )
-					: array( 'kind' => 'value', 'value' => get_option( $option ) );
+			foreach ( $module_options as $option ) {
+				if ( ! $option->export ) {
+					continue;
+				}
+				$options[ $option->name ] = ( 'page' === $option->type )
+					? self::page_ref( (int) get_option( $option->name ) )
+					: array( 'kind' => 'value', 'value' => get_option( $option->name ) );
 			}
 
 			if ( $options ) {
@@ -186,9 +193,17 @@ final class Karo_Kit_Transfer {
 			if ( ! isset( $modules[ $module_id ] ) || ! is_array( $options ) ) {
 				continue; // a module this site doesn't have
 			}
-			$class  = $modules[ $module_id ];
-			$map    = $class::export_map();
-			$labels = $class::export_labels();
+
+			$registry = new \KaroKit\Core\Options\Registry();
+			foreach ( $modules[ $module_id ] as $option ) {
+				$registry->add( $option );
+			}
+			$map    = $registry->exportMap();
+			$labels = $registry->exportLabels();
+
+			$module_label = '_kit' === $module_id
+				? __( 'Karo Kit', 'karo-kit' )
+				: Karo_Kit::modules()[ $module_id ]->label();
 
 			foreach ( $options as $option => $incoming ) {
 				// Only options this module still declares are importable —
@@ -198,7 +213,7 @@ final class Karo_Kit_Transfer {
 				}
 
 				$row = array(
-					'module' => Karo_Kit::class === $class ? __( 'Karo Kit', 'karo-kit' ) : $class::label(),
+					'module' => $module_label,
 					'option' => $option,
 					'label'  => $labels[ $option ] ?? $option,
 					'status' => 'ok',

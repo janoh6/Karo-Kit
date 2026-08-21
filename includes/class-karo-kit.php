@@ -132,6 +132,27 @@ final class Karo_Kit {
 				default: '',
 				setting: false,
 			),
+			// The pre-1.0 option-backed activity log, migrated into its own
+			// table by Karo_Kit_Log::install() and then deleted -- but a site
+			// stuck on that migration (or one that never reached admin_init
+			// again) can still have this row. Declared purely for the
+			// Registry's uninstall list, same as karo_kit_version above.
+			new Option(
+				name: Karo_Kit_Log::LEGACY_OPTION,
+				type: 'array',
+				default: array(),
+				setting: false,
+			),
+			// The log table's schema version. Not a setting, not exported --
+			// but a real wp_options row the old hardcoded uninstall list
+			// deleted, and dropping it here would have silently shrunk that
+			// list (see Task 11's regression test).
+			new Option(
+				name: Karo_Kit_Log::DB_VERSION_OPTION,
+				type: 'int',
+				default: 0,
+				setting: false,
+			),
 		);
 	}
 
@@ -180,23 +201,6 @@ final class Karo_Kit {
 				'default'           => $option->default,
 			) );
 		}
-	}
-
-	/**
-	 * Kit-level settings that travel with an export, in the same shape modules
-	 * use. The accent travels as a *family name*, not a colour: "use this
-	 * site's primary" stays meaningful on a target site with its own palette,
-	 * where a copied hex would not.
-	 *
-	 * @return array<string,string>
-	 */
-	public static function export_map(): array {
-		return array( Karo_Kit_Accent::SOURCE_OPT => 'value' );
-	}
-
-	/** @return array<string,string> */
-	public static function export_labels(): array {
-		return array( Karo_Kit_Accent::SOURCE_OPT => __( 'Accent colour source', 'karo-kit' ) );
 	}
 
 	/**

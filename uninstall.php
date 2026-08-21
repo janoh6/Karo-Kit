@@ -9,51 +9,30 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-$karo_kit_options = array(
-	'karo_kit_version',
-	'karo_kit_seed_version',
-	'karo_kit_accent_source',
-	// Gate — pages
-	'karo_kit_gate_login_page',
-	'karo_kit_gate_register_page',
-	'karo_kit_gate_account_page',
-	'karo_kit_gate_lostpw_page',
-	// Gate — maintenance
-	'karo_kit_gate_maintenance_page',
-	'karo_kit_gate_maintenance_on',
-	'karo_kit_gate_maintenance_mode',
-	// Gate — security
-	'karo_kit_gate_registration_on',
-	'karo_kit_gate_lockout_max',
-	'karo_kit_gate_lockout_window',
-	'karo_kit_gate_lockout_cooldown',
-	'karo_kit_gate_hide_login',
-	'karo_kit_gate_login_slug',
-	'karo_kit_gate_denied_page',
-	// Activity log
-	'karo_kit_log',
-	'karo_kit_log_db_version',
-	'karo_kit_gate_throttle_db_version',
-	// Etch — template board
-	'karo_kit_etch_order',
-	'karo_kit_etch_thumbs',
-	'karo_kit_etch_status',
-	'karo_kit_etch_board_on',
-	'karo_kit_etch_thumb_threshold',
-	'karo_kit_etch_thumb_auto_limit',
-	'karo_kit_etch_structure_on',
-	'karo_kit_etch_structure_dwell',
-	'karo_kit_etch_structure_placement',
-	'karo_kit_etch_structure_show_disabled',
-	'karo_kit_etch_sidebar_on',
-	'karo_kit_etch_sidebar_remember',
-	'karo_kit_etch_migrated',
-	// Import review stash is a transient, cleaned up separately below.
-);
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/includes/class-karo-kit-module.php';
+require_once __DIR__ . '/includes/class-karo-kit.php';
+require_once __DIR__ . '/includes/class-karo-kit-accent.php';
+require_once __DIR__ . '/modules/gate/enum-karo-kit-gate-mode.php';
+require_once __DIR__ . '/modules/gate/class-karo-kit-gate.php';
+require_once __DIR__ . '/modules/gate/class-karo-kit-gate-security.php';
+require_once __DIR__ . '/modules/etch/class-karo-kit-etch-board.php';
+require_once __DIR__ . '/modules/etch/class-karo-kit-etch-structure.php';
+require_once __DIR__ . '/modules/etch/class-karo-kit-etch-sidebar.php';
+require_once __DIR__ . '/modules/etch/class-karo-kit-etch.php';
 
-foreach ( $karo_kit_options as $karo_kit_option ) {
+// Instantiate cheaply, without booting hooks, purely to collect options().
+Karo_Kit::register( new KaroKit\Core\Module\StaticModuleAdapter( 'Karo_Kit_Gate' ) );
+Karo_Kit::register( new KaroKit\Core\Module\StaticModuleAdapter( 'Karo_Kit_Etch' ) );
+
+foreach ( Karo_Kit::registry()->uninstallNames() as $karo_kit_option ) {
 	delete_option( $karo_kit_option );
 }
+
+// karo_kit_seed_version predates the Registry (v0.16.9's now-deleted bespoke
+// seeding pass) and was never declared as an Option -- delete it directly so
+// a site that ran v0.16.9 doesn't keep this one orphaned row forever.
+delete_option( 'karo_kit_seed_version' );
 
 // The activity log has its own table.
 global $wpdb;
