@@ -625,9 +625,28 @@ final class Karo_Kit {
 			return;
 		}
 
+		// Karo_Kit_Gate_Settings logs a change whenever one of these options is
+		// added or updated -- appropriate for an admin's own choice, wrong here:
+		// seeding is a one-time upgrade action, not something anyone did, and it
+		// must not appear in the security audit log as though it were.
+		remove_all_actions( 'add_option_karo_kit_gate_registration_on' );
+		remove_all_actions( 'add_option_karo_kit_gate_maintenance_on' );
+		remove_all_actions( 'add_option_karo_kit_gate_hide_login' );
+
+		// Karo_Kit_Gate_Auth::filter_users_can_register() returns false whenever
+		// karo_kit_gate_registration_on is unset -- exactly the condition seeding
+		// runs under. Reading through that filter would make this read always
+		// observe the very bug being fixed and invert the seed. Read core's own
+		// unfiltered value instead.
+		$had_filter = remove_filter( 'option_users_can_register', array( 'Karo_Kit_Gate_Auth', 'filter_users_can_register' ) );
+		$core_registration = get_option( 'users_can_register' );
+		if ( $had_filter ) {
+			add_filter( 'option_users_can_register', array( 'Karo_Kit_Gate_Auth', 'filter_users_can_register' ) );
+		}
+
 		// add_option() is a no-op when the option already exists, so a
 		// deliberate choice is never overwritten.
-		add_option( 'karo_kit_gate_registration_on', get_option( 'users_can_register' ) ? '1' : '0' );
+		add_option( 'karo_kit_gate_registration_on', $core_registration ? '1' : '0' );
 		add_option( 'karo_kit_gate_maintenance_on', '0' );
 		add_option( 'karo_kit_gate_hide_login', '0' );
 

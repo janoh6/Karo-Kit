@@ -296,7 +296,11 @@ final class Karo_Kit_Transfer {
 				continue;
 			}
 
-			if ( 'same' === $row['status'] ) {
+			// Compare the stored value, not plan()'s display string: readable()
+			// collapses arrays to "%d entries", so two different arrays of
+			// equal length would look identical there and be wrongly treated
+			// as unchanged.
+			if ( get_option( $row['option'] ) == $row['value'] ) { // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison
 				$unchanged++;
 				continue;
 			}

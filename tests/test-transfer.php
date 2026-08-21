@@ -50,4 +50,19 @@ class Test_Transfer extends WP_UnitTestCase {
 		$this->assertSame( 0, $counts['applied'] );
 		$this->assertSame( 1, $counts['skipped'] );
 	}
+
+	public function test_different_arrays_of_equal_length_are_not_unchanged(): void {
+		update_option( 'karo_kit_etch_status', array( 'home' => 'live', 'about' => 'wip' ) );
+
+		$counts = Karo_Kit_Transfer::apply_plan( array(
+			array(
+				'option' => 'karo_kit_etch_status',
+				'status' => 'same', // plan() would have said 'same' -- both render as "2 entries"
+				'value'  => array( 'home' => 'wip', 'about' => 'live' ), // different values, same count
+			),
+		) );
+
+		$this->assertSame( 1, $counts['applied'], 'A different array must be applied even if plan() mislabeled it same.' );
+		$this->assertSame( array( 'home' => 'wip', 'about' => 'live' ), get_option( 'karo_kit_etch_status' ) );
+	}
 }

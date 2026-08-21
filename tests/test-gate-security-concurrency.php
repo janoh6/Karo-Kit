@@ -1,20 +1,20 @@
 <?php
 /**
+ * @group concurrency
+ *
  * Proves the rate-limiter increment survives genuine contention.
  *
- * @group concurrency
- * @package Karo_Kit
- */
-
-use PHPUnit\Framework\TestCase;
-
-/**
  * Deliberately NOT a WP_UnitTestCase. That base class wraps every test in a
  * database transaction and rolls it back afterwards, so the forked children
  * below — which hold their own connections — would neither see this test's
  * setup nor have their writes seen by it. A plain TestCase commits, which is
  * what makes the contention observable.
+ *
+ * @package Karo_Kit
  */
+
+use PHPUnit\Framework\TestCase;
+
 class Test_Gate_Security_Concurrency extends TestCase {
 
 	private const WORKERS  = 10;
