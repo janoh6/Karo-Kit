@@ -11,7 +11,7 @@
 	</testsuites>
 	<groups>
 		<exclude>
-			<!-- Forks real processes; run explicitly with --group concurrency. -->
+			<!-- Forks real processes; run explicitly via the concurrency test group. -->
 			<group>concurrency</group>
 		</exclude>
 	</groups>
