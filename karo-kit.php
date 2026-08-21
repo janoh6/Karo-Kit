@@ -46,34 +46,11 @@ define( 'KARO_KIT_FILE', __FILE__ );
 define( 'KARO_KIT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'KARO_KIT_URL', plugin_dir_url( __FILE__ ) );
 
-/* ---- Core ---------------------------------------------------------------- */
-require_once KARO_KIT_DIR . 'includes/class-karo-kit-module.php';
-require_once KARO_KIT_DIR . 'includes/class-karo-kit-log.php';
-require_once KARO_KIT_DIR . 'includes/class-karo-kit-accent.php';
-require_once KARO_KIT_DIR . 'includes/class-karo-kit-transfer.php';
-require_once KARO_KIT_DIR . 'includes/class-karo-kit-updates.php';
-require_once KARO_KIT_DIR . 'includes/class-karo-kit.php';
+/* ---- Core ------------------------------------------------------------ */
+require_once KARO_KIT_DIR . 'vendor/autoload.php';
 
 // Outside any hook, per the update checker's own guidance — see the class.
 Karo_Kit_Updates::init();
-
-/* ---- Module: Gate -------------------------------------------------------- */
-require_once KARO_KIT_DIR . 'modules/gate/enum-karo-kit-gate-mode.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-settings.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-security.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-login-url.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-auth.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-maintenance.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-shortcodes.php';
-require_once KARO_KIT_DIR . 'modules/gate/class-karo-kit-gate-etch.php';
-
-/* ---- Module: Etch -------------------------------------------------------- */
-require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch-board.php';
-require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch-structure.php';
-require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch-sidebar.php';
-require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch-settings.php';
-require_once KARO_KIT_DIR . 'modules/etch/class-karo-kit-etch.php';
 
 // Register modules with the core. Future modules add one line here.
 Karo_Kit::register( 'Karo_Kit_Gate' );

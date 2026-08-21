@@ -10,6 +10,15 @@
 		"phpunit/phpunit": "^9.6",
 		"yoast/phpunit-polyfills": "^2.0"
 	},
+	"autoload": {
+		"psr-4": {
+			"KaroKit\\": "src/"
+		},
+		"classmap": [
+			"includes/",
+			"modules/"
+		]
+	},
 	"config": {
 		"allow-plugins": false
 	}
