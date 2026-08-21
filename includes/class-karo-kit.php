@@ -26,6 +26,11 @@ final class Karo_Kit {
 	/** Settings that belong to the kit itself rather than to any one module. */
 	const OPTION_GROUP = 'karo_kit';
 
+	/** Bumped when the seeding routine changes what it writes. */
+	const SEED_VERSION = 1;
+
+	const SEED_VERSION_OPTION = 'karo_kit_seed_version';
+
 	/** Register a module class (must extend Karo_Kit_Module). */
 	public static function register( string $class ): void {
 		if ( is_subclass_of( $class, Karo_Kit_Module::class ) ) {
@@ -50,6 +55,7 @@ final class Karo_Kit {
 		Karo_Kit_Log::init();
 		Karo_Kit_Accent::init();
 		add_action( 'admin_init', array( __CLASS__, 'ensure_cron' ) );
+		add_action( 'admin_init', array( __CLASS__, 'maybe_seed_defaults' ) );
 	}
 
 	/**
@@ -594,6 +600,40 @@ final class Karo_Kit {
 		);
 	}
 
+	/**
+	 * Give the Gate toggles a real database row.
+	 *
+	 * get_option() cannot tell "never set" apart from "set to off", and
+	 * Karo_Kit_Gate_Auth::filter_users_can_register() reads a falsy value as
+	 * "closed" — so on a site that installed the kit and never opened its
+	 * settings, Karo Kit silently closed a registration screen the site had
+	 * deliberately enabled. Writing an explicit row makes the two states
+	 * distinguishable.
+	 *
+	 * Registration is seeded from core's own users_can_register rather than
+	 * from a fixed default: that is the answer this site already gave to the
+	 * same question, so seeding from it preserves the admin's intent instead
+	 * of imposing one of ours.
+	 *
+	 * Activation alone would not do — an in-place update never fires it, and
+	 * in-place updates are exactly the sites already carrying the bug. Hence
+	 * the version-guarded admin_init pass, matching the pattern in
+	 * Karo_Kit_Log::maybe_install().
+	 */
+	public static function maybe_seed_defaults(): void {
+		if ( (int) get_option( self::SEED_VERSION_OPTION ) === self::SEED_VERSION ) {
+			return;
+		}
+
+		// add_option() is a no-op when the option already exists, so a
+		// deliberate choice is never overwritten.
+		add_option( 'karo_kit_gate_registration_on', get_option( 'users_can_register' ) ? '1' : '0' );
+		add_option( 'karo_kit_gate_maintenance_on', '0' );
+		add_option( 'karo_kit_gate_hide_login', '0' );
+
+		update_option( self::SEED_VERSION_OPTION, self::SEED_VERSION );
+	}
+
 	/** Idempotent; also covers in-place updates, which skip activation. */
 	public static function ensure_cron(): void {
 		if ( ! wp_next_scheduled( self::CRON_DAILY ) ) {
@@ -603,6 +643,7 @@ final class Karo_Kit {
 
 	public static function activate(): void {
 		update_option( 'karo_kit_version', KARO_KIT_VER );
+		self::maybe_seed_defaults();
 		Karo_Kit_Log::install();
 		Karo_Kit_Gate_Security::install();
 		self::ensure_cron();

@@ -11,6 +11,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 $karo_kit_options = array(
 	'karo_kit_version',
+	'karo_kit_seed_version',
 	'karo_kit_accent_source',
 	// Gate — pages
 	'karo_kit_gate_login_page',
