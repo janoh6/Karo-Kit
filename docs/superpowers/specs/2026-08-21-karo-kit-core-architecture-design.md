@@ -236,20 +236,51 @@ One immutable value object per option:
 ```php
 final class Option {
     public function __construct(
-        public readonly string  $name,
-        public readonly string  $type,       // see below
-        public readonly mixed   $default = null,
-        public readonly ?string $label = null,
-        public readonly bool    $setting = true,    // register_setting + AJAX-writable
-        public readonly bool    $export = false,
-        public readonly bool    $uninstall = true,
-        public readonly bool    $autoload = true,
-        public readonly ?array  $enum = null,
-        public readonly ?int    $min = null,
-        public readonly ?int    $max = null,
+        public readonly string   $name,
+        public readonly string   $type,       // see below
+        public readonly mixed    $default = null,
+        public readonly ?Closure $defaultCallback = null,
+        public readonly ?string  $label = null,
+        public readonly bool     $setting = true,    // register_setting + AJAX-writable
+        public readonly bool     $export = false,
+        public readonly bool     $uninstall = true,
+        public readonly bool     $autoload = true,
+        public readonly ?array   $enum = null,
+        public readonly ?int     $min = null,
+        public readonly ?int     $max = null,
     ) {}
 }
 ```
+
+**`$defaultCallback` exists for exactly one option, and should stay that rare.**
+`karo_kit_gate_registration_on`'s correct seed value is not a fixed default —
+it is core's own `users_can_register`, read *around* `Karo_Kit_Gate_Auth`'s own
+filter on that same option, because that filter returns `false` precisely when
+the option being seeded is unset (the v0.16.9 fix in §1.2 exists because this
+was gotten wrong once already). A static `$default` cannot express "computed,
+with this specific filter suppressed for the read." When present,
+`$defaultCallback` is called at seed time instead of using `$default`, and
+nothing else — export, uninstall, and the typed `Repository` accessors — ever
+looks at it. Every other option in the kit uses a plain `$default`; reach for
+the callback only when a default is genuinely a *function of other site
+state* at seed time, not because a value is merely inconvenient to write out
+statically.
+
+**Seeding fully replaces v0.16.9's bespoke mechanism.** `karo_kit_gate_registration_on`,
+`karo_kit_gate_maintenance_on` and `karo_kit_gate_hide_login` move into the
+registry as ordinary declarations (the first with `defaultCallback`, matching
+its v0.16.9 behavior exactly — same filter-bypass, same source option). The
+registry's generic seeding pass becomes the *only* seeding path;
+`Karo_Kit::maybe_seed_defaults()`, `SEED_VERSION` and `SEED_VERSION_OPTION`
+are deleted outright rather than left as dead code, so there is never a
+question of which of two mechanisms governs a given option. This is safe on
+an already-v0.16.9 site precisely because seeding is `add_option()`-based and
+therefore idempotent: those three options already have real rows, so the new
+generic pass finds them present and writes nothing. It is equally safe on a
+site updating straight from v0.16.8 to v0.17.0 (skipping v0.16.9 entirely,
+e.g. via a manually uploaded release zip) — the generic pass is what performs
+first-time seeding for such a site, with no bespoke v0.16.9 step needed or
+possible in between.
 
 Types and their sanitizers: `bool` (cast to 0/1), `int` (absint, clamped to
 `min`/`max` when given), `string` (`sanitize_text_field`), `key`
@@ -336,12 +367,21 @@ exactly.
 
 ---
 
-## 3. Test harness (v0.17.0)
+## 3. Test harness
 
-`wp-cli scaffold plugin-tests` provides `tests/bootstrap.php` and
-`phpunit.xml.dist`. A new `.github/workflows/tests.yml` runs on push and pull
-request with a MySQL service container, matrixed over PHP 8.4 × WordPress
-6.8 and latest.
+**Already shipped, in v0.16.9** — pulled forward for the reason documented in
+that release's own plan: an atomic-SQL rewrite of a security control
+shouldn't ship on inspection alone. `composer.json`, `phpunit.xml.dist`,
+`tests/bootstrap.php` and `.github/workflows/tests.yml` (MySQL service
+container, matrixed over PHP 8.4 × WordPress 6.8 and latest) all exist on
+`main` already. v0.17.0 does not rebuild any of this — it adds registry- and
+module-container tests to the existing suite, following the established
+`tests/test-*.php` convention.
+
+The section below is retained as the original design record and for its list
+of first tests, several of which (rate limiter, import/export) were already
+written in v0.16.9; the maintenance-gate and pure-function tests remain
+open for v0.17.0 or later, whichever release first touches that code.
 
 First tests, in priority order:
 
