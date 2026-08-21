@@ -169,27 +169,6 @@
 	var CAPTURE_TIMEOUT = 20000;
 
 	/**
-	 * snapdom rasterises via a single flattened pass rather than a real,
-	 * scrollable viewport, so `position: fixed`/`sticky` -- meaningful only
-	 * relative to a viewport a user actually scrolls -- resolve unreliably:
-	 * a theme's sticky-footer pattern (fixed/sticky + a 100vh flex spacer)
-	 * can end up rendered right after the header instead of at the page's
-	 * true bottom. Forcing every such element to `static` first drops it
-	 * into normal document flow, so it rasterises exactly where it actually
-	 * sits in the page, and does so before scrollHeight is measured so the
-	 * resize/capture dimensions account for its real, flowed position.
-	 */
-	function neutralizeViewportAnchoredPositioning(doc) {
-		var els = doc.body.querySelectorAll('*');
-		for (var i = 0; i < els.length; i++) {
-			var pos = doc.defaultView.getComputedStyle(els[i]).position;
-			if (pos === 'fixed' || pos === 'sticky') {
-				els[i].style.setProperty('position', 'static', 'important');
-			}
-		}
-	}
-
-	/**
 	 * Render one template off-screen and rasterise it here in the browser.
 	 *
 	 * Thumbnails used to come from WordPress.com's mShots: the server asked an
@@ -224,13 +203,6 @@
 					var win = frame.contentWindow;
 					var doc = frame.contentDocument;
 					if (!win || !doc || !doc.body) { finish(new Error('preview did not load')); return; }
-
-					// Before measuring height, drop viewport-anchored elements
-					// (a sticky footer, a fixed header) into normal flow, so
-					// scrollHeight reflects where they actually end up in the
-					// flattened capture rather than their pre-flattening,
-					// viewport-relative position.
-					try { neutralizeViewportAnchoredPositioning(doc); } catch (e) { /* ignore */ }
 
 					// Grow to the full document so the capture isn't clipped to
 					// the viewport, then let layout settle before reading.

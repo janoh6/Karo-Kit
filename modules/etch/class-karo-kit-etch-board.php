@@ -793,7 +793,19 @@ final class Karo_Kit_Etch_Board {
 		$content = wp_filter_content_tags( $content, 'template' );
 		$content = str_replace( ']]>', ']]&gt;', $content );
 
-		return '<div class="wp-site-blocks">' . $content . '</div>';
+		// No wrapping div here. A real front-end request never gets one either --
+		// Etch renders a template's header/main/footer template-part blocks as
+		// plain top-level siblings of <body>, not nested inside a container --
+		// so a theme's sticky-footer layout (header/main/footer as direct flex
+		// children of body) depends on that exact structure. Wrapping them here
+		// (as WP core's own get_the_block_template_html() does for a real
+		// block-theme canvas, which this route otherwise mirrors) breaks that
+		// direct-child relationship: the footer collapses to wherever it falls
+		// in ordinary flow one level down, right after the header on a short
+		// page, instead of at the flex-pushed bottom -- exactly the kind of
+		// silent, capture-only divergence body_class_attr() above was already
+		// added to close for body's own classes.
+		return $content;
 	}
 
 	/** WordPress's own get_body_class(), pre-joined into a class="" attribute. */
